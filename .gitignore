@@ -1,0 +1,13 @@
+.venv/
+venv/
+ENV/
+env/
+.env
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.idea/
+.DS_Store
+.AppleDouble
+.LSOverride
