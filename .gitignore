@@ -2,7 +2,8 @@
 venv/
 ENV/
 env/
-
+database/
+parser/
 .env
 __pycache__/
 *.pyc
