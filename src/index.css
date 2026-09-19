@@ -1,0 +1,186 @@
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Arial, sans-serif;
+}
+
+.app {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+}
+
+/* 🔵 Пользователь */
+
+.user-marker {
+  width: 20px;
+  height: 20px;
+
+  background: #2563eb;
+
+  border: 4px solid white;
+
+  border-radius: 50%;
+
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+/* 🏠 Ночлежка */
+
+.hostel-marker {
+  width: 42px;
+  height: 42px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: white;
+
+  border: 2px solid #222;
+
+  border-radius: 50%;
+
+  cursor: pointer;
+
+  font-size: 21px;
+
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.25);
+
+  transition:
+    transform 0.15s;
+}
+
+.hostel-marker:hover {
+  transform: scale(1.15);
+}
+
+/* Карточка */
+
+.hostel-card {
+  position: absolute;
+
+  top: 20px;
+  left: 20px;
+
+  width: 340px;
+
+  padding: 24px;
+
+  background: white;
+
+  border-radius: 16px;
+
+  box-shadow:
+    0 8px 30px rgba(0, 0, 0, 0.2);
+
+  z-index: 10;
+}
+
+.hostel-card__close {
+  position: absolute;
+
+  top: 12px;
+  right: 12px;
+
+  width: 32px;
+  height: 32px;
+
+  border: none;
+
+  background: transparent;
+
+  font-size: 28px;
+
+  cursor: pointer;
+
+  color: #555;
+}
+
+.hostel-card h2 {
+  margin: 0 35px 12px 0;
+
+  font-size: 22px;
+}
+
+.hostel-card__address {
+  margin-bottom: 20px;
+
+  color: #555;
+}
+
+.hostel-card__info {
+  margin-bottom: 20px;
+}
+
+.hostel-card__info strong {
+  margin-left: 6px;
+}
+
+.hostel-card__description {
+  line-height: 1.5;
+
+  color: #555;
+
+  margin-bottom: 24px;
+}
+
+.hostel-card__buttons {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 10px;
+}
+
+.hostel-card__book,
+.hostel-card__contacts {
+  width: 100%;
+
+  padding: 12px 16px;
+
+  border-radius: 10px;
+
+  font-size: 16px;
+
+  cursor: pointer;
+}
+
+.hostel-card__book {
+  border: none;
+
+  background: #2563eb;
+
+  color: white;
+
+  font-weight: 600;
+}
+
+.hostel-card__book:hover {
+  background: #1d4ed8;
+}
+
+.hostel-card__contacts {
+  border: 1px solid #ddd;
+
+  background: white;
+
+  color: #222;
+}
+
+.hostel-card__contacts:hover {
+  background: #f5f5f5;
+}
