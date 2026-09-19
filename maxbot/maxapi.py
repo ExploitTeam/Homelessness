@@ -95,13 +95,13 @@ class Bot:
         """Cycle for getting events (messages)"""
         print("Bot started.")
         while True:
-            #try:
+            try:
                 updates = await self.__get_updates()
                 for upd in updates.get("updates", []):
                     await self._route_update(upd)
-            #except Exception as e:
-            #    warnings.warn(f"ERROR WHILE PULLING: {e}")
-            #    await asyncio.sleep(2)
+            except Exception as e:
+                warnings.warn(f"ERROR WHILE PULLING: {e}")
+                await asyncio.sleep(2)
 
     async def close(self):
         if self.session:
