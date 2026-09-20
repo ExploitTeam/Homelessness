@@ -1,4 +1,4 @@
-from classes import Homestay, User
+from database.classes import Homestay, User
 import sqlite3
 from os import getenv
 from dotenv import load_dotenv
@@ -105,25 +105,25 @@ def get_homestay(id : int | None = None,
     with sqlite3.connect(database_name) as conn:
             conn.execute("PRAGMA foreign_keys = ON")
             cursor = conn.cursor()
-    
+
             conditions = []
             parameters = []
-    
+
             if id is not None:
                 conditions.append("id = ?")
                 parameters.append(id)
-    
+
             if address is not None:
                 conditions.append("address = ?")
                 parameters.append(address)
-    
+
             if is_working is not None:
                 conditions.append("is_working = ?")
                 parameters.append(is_working)
-    
+
             if not conditions:
                 return None
-    
+
             query = f"""
                 SELECT
                     id,
@@ -137,14 +137,14 @@ def get_homestay(id : int | None = None,
                 FROM homestays
                 WHERE {" AND ".join(conditions)}
             """
-    
+
             cursor.execute(query, parameters)
-    
+
             row = cursor.fetchone()
-    
+
             if row is None:
                 return None
-    
+
             return Homestay(
                 id=row[0],
                 address=row[1],

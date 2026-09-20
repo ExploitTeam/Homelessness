@@ -1,6 +1,6 @@
 import asyncio
 from database import db_manager
-from inline_keyboard import *
+from maxbot.inline_keyboard import *
 from maxbot.maxapi import Bot
 import os
 from dotenv import load_dotenv
@@ -16,56 +16,38 @@ start_text = ("Привет{} 👋\n"
               "Нажмите кнопку 'Отправить геопозицию', чтобы посмотреть ближайшие к вам ночлежки.\n\n"
               "Ваш ID: {}.")
 
+async def do_on_start(usr):
+    name = usr.get('first_name', None)
+    id = usr.get('user_id', None)
+    keyboard = InlineKeyboardMarkup()
+    usr = get_user(id)
+    if not usr:
+        usr = User(id, name, 0, "", -1)
+        insert_or_update_user(usr)
+
+    if id in ADMINS or usr.user_type == 2:
+        keyboard.add_button("Добавить менеджера", button_types.callback, payload="set_manager")
+        keyboard.add_button("Добавить администратора", button_types.callback, payload="set_admin")
+        keyboard.add_button("Сделать обычным пользователем", button_types.callback, payload="restrict_user")
+    if name:
+        name = f", {name}"
+        text = start_text.format(name, id)
+    else:
+        text = start_text.format("", id)
+
+    keyboard.add_button("Отправить геопозицию", button_types.request_geo_location, payload="send_geo")
+    keyboard.add_button("Открыть мини приложение", button_types.callback, payload="open_mini_app")
+    await bot.send_msg(id, text, keyboard.keyboard)
+    print(text)
+
 @bot.message_handler(commands=['start'])
 async def only_start(update):
     user = update.get('message', {}).get('sender', {})
-    name = user.get('first_name', {})
-    id = user.get('user_id', {})
-    keyboard = InlineKeyboardMarkup()
-    usr = get_user(id)
-    if not usr:
-        usr = User(id, name, 0, "", -1)
-        insert_or_update_user(usr)
-
-    if id in ADMINS or usr.user_type == 2:
-        keyboard.add_button("Добавить менеджера", button_types.callback, payload="set_manager")
-        keyboard.add_button("Добавить менеджера", button_types.callback, payload="set_admin")
-        keyboard.add_button("Сделать обычным пользователем", button_types.callback, payload="restrict_user")
-    if name:
-        name = f", {name}"
-        text = start_text.format(name, id)
-    else:
-        text = start_text.format("", id)
-    print(text)
-    keyboard.add_button("Отправить геопозицию", button_types.request_geo_location, payload="send_geo")
-    keyboard.add_button("Открыть мини приложение", button_types.callback, payload="open_mini_app")
-    await bot.send_msg(id, text, keyboard.keyboard)
+    await do_on_start(user)
 
 @bot.message_handler(func=lambda msg, tp: tp == "bot_started")
 async def on_start(update):
-    name = update.get('user', {}).get('first_name', None)
-    id = update.get('user', {}).get('user_id', None)
-    keyboard = InlineKeyboardMarkup()
-    usr = get_user(id)
-    if not usr:
-        usr = User(id, name, 0, "", -1)
-        insert_or_update_user(usr)
-
-    if id in ADMINS or usr.user_type == 2:
-        keyboard.add_button("Добавить менеджера", button_types.callback, payload="set_manager")
-        keyboard.add_button("Добавить менеджера", button_types.callback, payload="set_admin")
-        keyboard.add_button("Сделать обычным пользователем", button_types.callback, payload="restrict_user")
-    if name:
-        name = f", {name}"
-        text = start_text.format(name, id)
-    else:
-        text = start_text.format("", id)
-
-    keyboard = InlineKeyboardMarkup()
-    keyboard.add_button("Отправить геопозицию", button_types.request_geo_location, payload="send_geo")
-    keyboard.add_button("Открыть мини приложение", button_types.callback, payload="open_mini_app")
-    await bot.send_msg(id, text, keyboard.keyboard)
-    print(text)
+    await do_on_start(update.get('user', {}))
 
 
 """Set user as manager"""

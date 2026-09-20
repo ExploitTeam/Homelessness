@@ -2,7 +2,7 @@ import asyncio
 import ssl
 import warnings
 import aiohttp
-from exceptions_max import *
+from maxbot.exceptions_max import *
 
 class Bot:
     api_url = "https://platform-api2.max.ru"
@@ -11,7 +11,7 @@ class Bot:
         self.command_handlers = {}
         self.token = token
         self.session = None
-        self.ssl_context = ssl.create_default_context(cafile="Russian_Trusted_CA.pem")
+        self.ssl_context = ssl.create_default_context(cafile="maxbot/Russian_Trusted_CA.pem")
         self.next_step = {}
 
     def connect(self):
