@@ -264,3 +264,126 @@ body {
   font-size: 16px;
 }
 }
+/* Анимация карточки */
+
+.hostel-card {
+  animation: hostelCardAppear 0.3s ease-out;
+  transform-origin: bottom left;
+}
+
+@keyframes hostelCardAppear {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Контент карточки */
+
+.hostel-card__content {
+  animation: hostelContentAppear 0.25s ease-out;
+}
+
+@keyframes hostelContentAppear {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Нажатие кнопок */
+
+.hostel-card__book,
+.hostel-card__contacts,
+.hostel-card__back {
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+.hostel-card__book:active,
+.hostel-card__contacts:active,
+.hostel-card__back:active {
+  transform: scale(0.97);
+}
+
+/* Забронировано */
+
+.hostel-card__book--success {
+  background: #16a34a;
+}
+
+.hostel-card__book--success:hover {
+  background: #15803d;
+}
+
+/* Контакты */
+
+.hostel-card__contacts-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+  background: #e8f0ff;
+
+  font-size: 28px;
+}
+
+.hostel-card__content--contacts {
+  text-align: center;
+}
+
+.hostel-card__content--contacts h2 {
+  margin-bottom: 24px;
+}
+
+.hostel-card__contact-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  padding: 12px 0;
+
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.hostel-card__contact-item span:first-child {
+  font-size: 20px;
+}
+
+.hostel-card__back {
+  width: 100%;
+  margin-top: 20px;
+
+  padding: 12px 16px;
+
+  border: none;
+  border-radius: 10px;
+
+  background: #2563eb;
+  color: white;
+
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.hostel-card__back:hover {
+  background: #1d4ed8;
+}

@@ -13,11 +13,11 @@ function App() {
   const [selectedHostel, setSelectedHostel] =
     useState<Hostel | null>(null);
 
-  const {
-    location,
-  } = useUserLocation();
+  const { location } = useUserLocation();
 
-  const mapLocation = location ?? mockUserLocation
+  // Если геолокация ещё недоступна то
+  // используем Москву как запасной вариант
+  const mapLocation = location ?? mockUserLocation;
 
   const {
     hostels,
@@ -35,30 +35,6 @@ function App() {
   const handleCloseCard = useCallback(() => {
     setSelectedHostel(null);
   }, []);
-
-  const handleBook = useCallback(() => {
-    if (!selectedHostel) {
-      return;
-    }
-
-    console.log(
-      "Будущий запрос на сервер:",
-      {
-        hostelId: selectedHostel.id,
-      }
-    );
-  }, [selectedHostel]);
-
-  const handleContacts = useCallback(() => {
-    if (!selectedHostel) {
-      return;
-    }
-
-    alert(
-      `Телефон: ${selectedHostel.phone}\nEmail: ${selectedHostel.email}`
-    );
-  }, [selectedHostel]);
-  // удалить это говно
 
   return (
     <div className="app">
@@ -84,8 +60,6 @@ function App() {
         <HostelCard
           hostel={selectedHostel}
           onClose={handleCloseCard}
-          onBook={handleBook}
-          onContacts={handleContacts}
         />
       )}
     </div>
