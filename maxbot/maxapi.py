@@ -12,6 +12,7 @@ class Bot:
         self.token = token
         self.session = None
         self.ssl_context = ssl.create_default_context(cafile="Russian_Trusted_CA.pem")
+        self.next_step = {}
 
     def connect(self):
         self.session = aiohttp.ClientSession(
@@ -102,6 +103,27 @@ class Bot:
             except Exception as e:
                 warnings.warn(f"ERROR WHILE PULLING: {e}")
                 await asyncio.sleep(2)
+
+    def set_next_step(self, id, step):
+        self.next_step[id] = step
+
+    def get_next_step(self, id):
+        try:
+            id = int(id)
+        except ValueError:
+            pass
+        if id in self.next_step:
+            return self.next_step[id]
+        return ""
+
+    def clear_next_step(self, id):
+        try:
+            id = int(id)
+        except ValueError:
+            pass
+
+        if id in self.next_step:
+            del self.next_step[id]
 
     async def close(self):
         if self.session:
