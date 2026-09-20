@@ -27,11 +27,16 @@ export default function MoscowMap({
 }: MoscowMapProps) {
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const map = useRef<Map | null>(null);
-
+  const markers = useRef<Marker[]>([]);
+  // создание картыв
   useEffect(() => {
-    if (!mapContainer.current) return;
+    if (!mapContainer.current) {
+      return;
+    }
 
-    if (map.current) return;
+    if (map.current) {
+      return;
+    }
 
     const newMap = new Map({
       container: mapContainer.current,
@@ -61,9 +66,7 @@ export default function MoscowMap({
         layers: [
           {
             id: "osm",
-
             type: "raster",
-
             source: "osm",
           },
         ],
@@ -82,46 +85,84 @@ export default function MoscowMap({
       "bottom-right"
     );
 
-    //Точка пользователя
+    return () => {
+      newMap.remove();
+      map.current = null;
+    };
+  }, []);
+
+  // Перемещаем карту к пользователю
+  useEffect(() => {
+    if (!map.current) {
+      return;
+    }
+
+    map.current.flyTo({
+      center: [
+        userLocation.lng,
+        userLocation.lat,
+      ],
+      zoom: 13,
+      duration: 1000,
+    });
+  }, [userLocation]);
+
+  // Создаём маркеры
+  useEffect(() => {
+    if (!map.current) {
+      return;
+    }
+    // Удалеиние старые маркеров
+    markers.current.forEach((marker) => {
+      marker.remove()
+    });
+
+    markers.current = [];
+
+    // Точка пользователя
     const userElement = document.createElement("div");
 
     userElement.className = "user-marker";
 
-    new Marker({
+    const userMarker = new Marker({
       element: userElement,
     })
       .setLngLat([
         userLocation.lng,
-        userLocation.lat,
+        userLocation.lat
       ])
-      .addTo(newMap);
+      .addTo(map.current);
 
-    //Ночлежки
+    markers.current.push(userMarker);
+  
+    // Ночлежки
     hostels.forEach((hostel) => {
       const element = document.createElement("div");
 
       element.className = "hostel-marker";
       element.innerText = "🏠";
+      element.title = hostel.name;
 
       element.addEventListener("click", () => {
         onHostelClick(hostel);
       });
 
-      new Marker({
+      const hostelMarker = new Marker({
         element,
       })
         .setLngLat([
           hostel.lng,
-          hostel.lat,
+          hostel.lat
         ])
-        .addTo(newMap);
-    });
+        .addTo(map.current!);
 
-    return () => {
-      newMap.remove();
-      map.current = null;
-    };
-  }, [hostels, userLocation, onHostelClick]);
+        markers.current.push(hostelMarker);
+    });
+  }, [
+    hostels,
+    userLocation,
+    onHostelClick,
+  ]);
 
   return (
     <div

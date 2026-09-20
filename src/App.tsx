@@ -7,6 +7,7 @@ import { useUserLocation } from "./hooks/useUserLocation";
 import { useHostels } from "./hooks/useHostels";
 
 import type { Hostel } from "./types";
+import { mockUserLocation } from "./data/mockData";
 
 function App() {
   const [selectedHostel, setSelectedHostel] =
@@ -14,15 +15,15 @@ function App() {
 
   const {
     location,
-    loading: locationLoading,
-    error: locationError,
   } = useUserLocation();
+
+  const mapLocation = location ?? mockUserLocation
 
   const {
     hostels,
     loading: hostelsLoading,
     error: hostelsError,
-  } = useHostels(location);
+  } = useHostels(mapLocation);
 
   const handleHostelClick = useCallback(
     (hostel: Hostel) => {
@@ -57,29 +58,13 @@ function App() {
       `Телефон: ${selectedHostel.phone}\nEmail: ${selectedHostel.email}`
     );
   }, [selectedHostel]);
-
-  if (locationLoading) {
-    return (
-      <div className="loading-screen">
-        Определяем ваше местоположение...
-      </div>
-    );
-  }
-
-  if (locationError || !location) {
-    return (
-      <div className="loading-screen">
-        {locationError ??
-          "Местоположение недоступно"}
-      </div>
-    );
-  }
+  // удалить это говно
 
   return (
     <div className="app">
       <MoscowMap
         hostels={hostels}
-        userLocation={location}
+        userLocation={mapLocation}
         onHostelClick={handleHostelClick}
       />
 

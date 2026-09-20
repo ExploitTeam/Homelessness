@@ -19,46 +19,49 @@ export function useUserLocation(): UseUserLocationResult {
     useState<string | null>(null);
 
   useEffect(() => {
-    if (!navigator.geolocation) {
+  if (!navigator.geolocation) {
+    setError(
+      "Браузер не поддерживает определение местоположения"
+    );
+    setLoading(false);
+    return;
+  }
+
+  const watchId = navigator.geolocation.watchPosition(
+    (position) => {
+      setLocation({
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+      });
+
+      setLoading(false);
+      setError(null);
+    },
+
+    (error) => {
+      console.error(
+        "Ошибка определения вашего местоположения:",
+        error
+      );
+
       setError(
-        "Браузер не поддерживает определение местоположения"
+        "Не удалось определить ваше местоположение"
       );
 
       setLoading(false);
+    },
 
-      return;
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0,
     }
+  );
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setLocation({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        });
-
-        setLoading(false);
-      },
-
-      (error) => {
-        console.error(
-          "Ошибка определения местоположения:",
-          error
-        );
-
-        setError(
-          "Не удалось определить ваше местоположение"
-        );
-
-        setLoading(false);
-      },
-
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 30000,
-      }
-    );
-  }, []);
+  return () => {
+    navigator.geolocation.clearWatch(watchId);
+  };
+}, []);
 
   return {
     location,
