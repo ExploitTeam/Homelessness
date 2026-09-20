@@ -8,6 +8,7 @@ class User:
         self.phone_number = phone_number
         self.id_homestay = id_homestay
 
+
     def __get_type(self):
         if self.user_type == 0:
             return "Пользователь"

@@ -44,6 +44,30 @@ class Bot:
                 raise ConnectionMaxError(f"Error while sending message. Code: {response.status}")
             return data
 
+    async def edit_msg(self, message_id : int, text : str, btns: list = []):
+        """Send a message to chat"""
+
+        body = {'text': text,
+                  'attachments': [
+                      {
+                          "type": "inline_keyboard",
+                          "payload": {
+                              "buttons": btns
+                          }
+                      }
+                  ] if btns else []}
+        print(body)
+        async with self.session.put(
+            f'{self.api_url}/messages',
+            params={'message_id': message_id},
+            json=body,
+            ssl=self.ssl_context,
+        ) as response:
+            data = await response.json()
+            if response.status != 200:
+                raise ConnectionMaxError(f"Error while sending message. Code: {response.status}")
+            return data
+
     def message_handler(self, commands=None, func=None):
         def decorator(handler_func):
             if commands:

@@ -3,7 +3,6 @@ import sqlite3
 from os import getenv
 from dotenv import load_dotenv
 
-
 load_dotenv()
 database_name = f"{getenv('DB_NAME', 'default')}.db"
 
@@ -31,12 +30,11 @@ def initialize_database():
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id INTEGER PRIMARY KEY,
                 username TEXT,
                 user_type INTEGER DEFAULT 0,
                 phone_number TEXT,
-                id_homestay INTEGER,
-                FOREIGN KEY (id_homestay) REFERENCES homestays(id)
+                id_homestay INTEGER
             )
         """)
 
@@ -165,40 +163,27 @@ def insert_or_update_user(user : User | None = None):
             conn.execute("PRAGMA foreign_keys = ON")
             cursor = conn.cursor()
 
-            if user.id == 0:
-                cursor.execute("""
-                    INSERT INTO users (
-                        username,
-                        user_type,
-                        phone_number,
-                        id_homestay
-                    )
-                    VALUES (?, ?, ?, ?)
-                """, (
-                    user.username,
-                    user.user_type,
-                    user.phone_number,
-                    user.id_homestay
-                ))
-
-                user.id = cursor.lastrowid
-
-            else:
-                cursor.execute("""
-                    UPDATE users
-                    SET
-                        username = ?,
-                        user_type = ?,
-                        phone_number = ?,
-                        id_homestay = ?
-                    WHERE id = ?
-                """, (
-                    user.username,
-                    user.user_type,
-                    user.phone_number,
-                    user.id_homestay,
-                    user.id
-                ))
+            # ИСПРАВЛЕННЫЙ ВАРИАНТ SQL-ЗАПРОСА:
+            cursor.execute("""
+                INSERT INTO users (
+                    id,
+                    username,
+                    user_type,
+                    phone_number,
+                    id_homestay
+                ) VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET 
+                    username = excluded.username, 
+                    user_type = excluded.user_type,
+                    phone_number = excluded.phone_number,
+                    id_homestay = excluded.id_homestay
+            """, (
+                user.id,
+                user.username,
+                user.user_type,
+                user.phone_number,
+                user.id_homestay
+            ))
 
 
 def insert_or_update_homestay(homestay : Homestay | None = None):
@@ -256,3 +241,5 @@ def insert_or_update_homestay(homestay : Homestay | None = None):
                     homestay.is_working,
                     homestay.additional_info
                 ))
+def get_all_homestays():
+    pass

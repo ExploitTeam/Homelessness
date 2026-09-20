@@ -1,12 +1,9 @@
-import asyncio
-from database import db_manager
-from maxbot import inline_keyboard
+from maxbot.module import *
 from maxbot.inline_keyboard import *
 from maxbot.maxapi import Bot
 import os
 from dotenv import load_dotenv
 from database.db_manager import *
-from parser.modules import *
 load_dotenv()
 
 TOKEN = os.getenv("MAX_TOKEN", "")
@@ -20,81 +17,85 @@ start_text = ("Привет{} 👋\n"
 keyboard_to_start = InlineKeyboardMarkup()
 keyboard_to_start.add_button("На главную", button_types.callback, payload="load_start")
 
-async def do_on_start(usr):
-    global start_text
-    name = usr.get('first_name', None)
-    id = usr.get('user_id', None)
-    keyboard = InlineKeyboardMarkup()
-    usr = get_user(id)
-    if not usr:
-        usr = User(id, name, 0, "", -1)
-        insert_or_update_user(usr)
-
-    if id in ADMINS or usr.user_type == 2:
-        keyboard.add_button("Добавить менеджера", button_types.callback, payload="set_manager")
-        keyboard.add_button("Добавить администратора", button_types.callback, payload="set_admin")
-        keyboard.add_button("Сделать обычным пользователем", button_types.callback, payload="restrict_user")
-    if name:
-        name = f", {name}"
-        text = start_text.format(name, id)
-    else:
-        text = start_text.format("", id)
-
-    keyboard.add_button("Отправить геопозицию", button_types.request_geo_location, payload="send_geo")
-    keyboard.add_button("Открыть мини приложение", button_types.callback, payload="open_mini_app")
-    await bot.send_msg(id, text, keyboard.keyboard)
-    print(text)
-
 @bot.message_handler(commands=['start'])
 async def only_start(update):
     user = update.get('message', {}).get('sender', {})
-    await do_on_start(user)
+    await do_on_start(bot, user)
 
 @bot.message_handler(func=lambda msg, tp: tp == "bot_started")
 async def on_start(update):
-    await do_on_start(update.get('user', {}))
+    await do_on_start(bot, update.get('user', {}))
 
 @bot.message_handler(func=lambda msg, tp:
                      msg.get("callback", {}).get("payload", "") == "load_start")
 async def to_start(update):
     bot.clear_next_step(update.get("callback", {}).get("user", {}).get("user_id", 0))
-    await do_on_start(update.get("callback", {}).get("user", {}))
+    await do_on_start(bot, update.get("callback", {}).get("user", {}))
 
-"""Set user as manager"""
+"""user settings"""
 
 @bot.message_handler(func=lambda msg, tp:
-                    msg.get("callback", {}).get("payload", "") == "set_manager" or
-                    msg.get("callback", {}).get("payload", "") == "set_admin")
-async def set_manager_or_admin(update):
+                    msg.get("callback", {}).get("payload", "") == "edit_user")
+async def edit_user_button_pressed(update):
     user = update.get('callback', {}).get('user', {})
     id = user.get('user_id', {})
-    bot.set_next_step(id, update.get('callback', {}).get("payload", ""))
-    await bot.send_msg(id, f"Пожалуйста, отправьте в чат id менеджера. ID отображается при запуске бота.",
-                       keyboard_to_start.keyboard)
+    bot.set_next_step(id, "set_user_for_edit")
+    await bot.send_msg(id, f"Введите ID пользователя для редактирования. ID видно в этом боте в главном меню.")
 
 @bot.message_handler(func=lambda msg, tp:
                     bot.get_next_step(
-                        msg.get("message", {}).get("sender", {}).get("user_id", 0))
-                        .startswith("set_homestay_for_manager_"))
-async def set_manager(update):
+                        msg.get("message", {}).get("sender", {}).get("user_id", 0)) == "set_user_for_edit")
+async def set_user_for_edit(update):
     user = update.get('message', {}).get('sender', {})
+    text = update.get('message', {}).get('body', {}).get('text', "")
     id = user.get('user_id', {})
-    id_homestay =  update.get('message', {}).get('body', {}).get('text', 0)
-    id_manager = bot.get_next_step(id).replace("set_homestay_for_manager_", "")
     try:
-        id_homestay = int(id_homestay)
+        text = int(text)
     except ValueError:
-        await bot.send_msg(id, f"Неверный ввод. ", keyboard_to_start.keyboard)
+        await bot.send_msg(id, f"Ошибка ввода", keyboard_to_start.keyboard)
         return
-    homestay = get_homestay(id_homestay)
-    if not homestay:
-        await bot.send_msg(id, f"Не удалось найти это место.", keyboard_to_start.keyboard)
-        bot.clear_next_step(id)
+
+    usr = get_user(text)
+    if not usr:
+        await bot.send_msg(id, "Не удалось найти такого пользователя. Попробуйте еще раз.",
+                           keyboard_to_start.keyboard)
         return
-    usr = get_user(id_manager)
-    usr.id_homestay = id_homestay
-    insert_or_update_user(usr)
-    await bot.send_msg(id, f"Настройки изменены!\n\n{usr}", keyboard_to_start.keyboard)
+
+    res = await bot.send_msg(id, f"Информация о пользователе:\n{usr}")
+    keyboard = generate_buttons_by_user_privilege(usr, res.get('message', {}).get('body', {}).get('mid'))
+    keyboard.add_button("На главную", button_types.callback, payload="load_start")
+    await bot.edit_msg(res.get('message', {}).get('body', {}).get('mid'),
+                       f"Информация о пользователе:\n{usr}",
+                       keyboard.keyboard)
+
+"""Set user as [manager, admin, user]"""
+
+@bot.message_handler(func=lambda msg, tp:
+                    json.loads(msg.get("callback", {}).get("payload", "")
+                     )["command"] in ["set_admin", "set_manager", "restrict_user"])
+async def set_manager(update):
+    user = update.get('callback', {}).get('user', {})
+    id = user.get('user_id', {})
+    current_task = update.get("callback", {}).get("payload", "")
+    if not current_task:
+        return
+    current_task = json.loads(current_task)
+    usr_id = int(current_task.get("user", 0))
+    msg_id = current_task.get("msg_id", "")
+    usr = get_user(usr_id)
+    keyboard = InlineKeyboardMarkup()
+    if current_task["command"] == "set_admin":
+        usr.user_type = 2
+        insert_or_update_user(usr)
+    if current_task["command"] == "set_manager":
+        usr.user_type = 1
+        insert_or_update_user(usr)
+    if current_task["command"] == "restrict_user":
+        usr.user_type = 0
+        insert_or_update_user(usr)
+    keyboard = generate_buttons_by_user_privilege(usr, msg_id)
+    keyboard.add_button("На главную", button_types.callback, payload="load_start")
+    await bot.edit_msg(msg_id, f"Информация о пользователе:\n{usr}", keyboard.keyboard)
 
 @bot.message_handler(func=lambda msg, tp:
                     bot.get_next_step(
@@ -177,26 +178,3 @@ async def on_sending_geo(update):
         keyboard.add_button("Смотреть на карте", button_types.callback, payload="open_mini_app")
         keyboard.add_button("На главную", button_types.callback, payload="load_start")
         await bot.send_msg(id, f"Доступные точки (от самой близкой до дальней):\n{res}", keyboard.keyboard)
-
-def show_all(name=None):
-    # all = get_all_homestays() --- ОПИСАТЬ В db_manager.py!!!!!
-    all = [ # ПРИМЕР НА ВРЕМЯ ОТСУТСТВИЯ РЕАЛЬНОЙ ИНФЫ. УБРАТЬ!
-        Homestay(1, "Улица Пушкина 1", 20, 5, "9:00", "20:00",
-                 1, "Пункт для ночлежки"),
-        Homestay(2, "Улица Ленина 5", -1, -1, "9:00", "20:00",
-                 1, "Пункт бесплатной еды")
-    ]
-    if name:
-        all = sort_places(all, name)
-    res = ""
-    for i in all:
-        res += (f"🆔 {i.id}\n"
-                f"🏠 Адрес: {i.address}\n{
-                f'🙅‍♂️ Занято: {i.available_beds}\n👤 Всего мест: {i.all_beds}\n' if i.all_beds > 0 else ''}"
-                f"{'🟢 Работает' if i.is_working else '🔴 Не работает'}\n"
-                f"⏳ Время работы: {i.open_time} - {i.close_time}\n"
-                f"ℹ Дополнительная информация: {i.additional_info}\n\n")
-    if not res:
-        res = ("Сейчас доступных точек нет(\n"
-               "Зайдите немного позже, возможно, ситуация изменится.")
-    return res
