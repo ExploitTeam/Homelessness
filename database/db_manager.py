@@ -24,7 +24,8 @@ def initialize_database():
                 open_time TEXT NOT NULL DEFAULT "",
                 close_time TEXT NOT NULL DEFAULT "",
                 is_working INTEGER DEFAULT 0,
-                additional_info TEXT DEFAULT ""
+                additional_info TEXT,
+                homestay_type INT DEFAULT 0
             )
         """)
 
