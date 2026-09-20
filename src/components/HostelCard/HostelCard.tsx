@@ -2,6 +2,11 @@ import { useState } from "react";
 
 import type { Hostel, UserLocation } from "../../types";
 
+import {
+  getNearestMetro,
+  getWalkingTime,
+} from "../../utils/metro";
+
 interface HostelCardProps {
   hostel: Hostel;
   userLocation: UserLocation;
@@ -54,6 +59,13 @@ export default function HostelCard({
     hostel
   );
 
+  const nearestMetro = getNearestMetro(hostel);
+
+  const walkingTime = getWalkingTime(
+    hostel,
+    nearestMetro
+  );
+
   const handleBook = () => {
     if (booking || booked) {
       return;
@@ -104,6 +116,24 @@ export default function HostelCard({
             {" "}из {hostel.bedsTotal}
           </div>
 
+          <div className="hostel-card__metro">
+            <div className="hostel-card__metro-title">
+              🚇 Ближайшее метро
+            </div>
+
+          <div className="hostel-card__metro-station">
+            <strong>{nearestMetro.name}</strong>
+          </div>
+
+          <div className="hostel-card__metro-line">
+            {nearestMetro.line}
+          </div>
+
+          <div className="hostel-card__metro-walk">
+            🚶 Примерно {walkingTime} мин пешком
+          </div>
+        </div>
+            
           <p className="hostel-card__description">
             {hostel.description}
           </p>
