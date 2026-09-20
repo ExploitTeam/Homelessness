@@ -21,7 +21,7 @@ class User:
                 f"👤 Username: {self.username}\n"
                 f"⚡️ Тип учетной записи: {self.__get_type()}\n"
                 f"Телефон: {self.phone_number if self.phone_number else 'n/a'}\n"
-                f"Привязка к точке: {self.id_homestay}\n")
+                f"Привязка к точке: {self.id_homestay if self.id_homestay > -1 else 'без привязки'}\n")
 
 
 class Homestay:
