@@ -59,6 +59,7 @@ function App() {
       {selectedHostel && (
         <HostelCard
           hostel={selectedHostel}
+          userLocation={mapLocation}
           onClose={handleCloseCard}
         />
       )}

@@ -387,3 +387,12 @@ body {
 .hostel-card__back:hover {
   background: #1d4ed8;
 }
+
+.hostel-card__distance {
+  margin: -10px 0 20px;
+  color: #555;
+}
+
+.hostel-card__distance strong {
+  color: #222;
+}

@@ -1,14 +1,43 @@
 import { useState } from "react";
 
-import type { Hostel } from "../../types";
+import type { Hostel, UserLocation } from "../../types";
 
 interface HostelCardProps {
   hostel: Hostel;
+  userLocation: UserLocation;
   onClose: () => void;
+}
+
+function getDistance(
+  userLocation: UserLocation,
+  hostel: Hostel
+): number {
+  const R = 6371;
+
+  const lat1 = (userLocation.lat * Math.PI) / 180;
+  const lat2 = (hostel.lat * Math.PI) / 180;
+
+  const dLat =
+    ((hostel.lat - userLocation.lat) * Math.PI) / 180;
+
+  const dLng =
+    ((hostel.lng - userLocation.lng) * Math.PI) / 180;
+
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) *
+      Math.cos(lat2) *
+      Math.sin(dLng / 2) ** 2;
+
+  const c =
+    2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
 }
 
 export default function HostelCard({
   hostel,
+  userLocation,
   onClose,
 }: HostelCardProps) {
   const [showContacts, setShowContacts] =
@@ -20,6 +49,11 @@ export default function HostelCard({
   const [booked, setBooked] =
     useState(false);
 
+  const distance = getDistance(
+    userLocation,
+    hostel
+  );
+
   const handleBook = () => {
     if (booking || booked) {
       return;
@@ -27,7 +61,6 @@ export default function HostelCard({
 
     setBooking(true);
 
-    // Пока имитация запроса на сервер
     setTimeout(() => {
       setBooking(false);
       setBooked(true);
@@ -54,6 +87,15 @@ export default function HostelCard({
 
           <p className="hostel-card__address">
             📍 {hostel.address}
+          </p>
+
+          <p className="hostel-card__distance">
+            🚶 Расстояние:{" "}
+            <strong>
+              {distance < 1
+                ? `${Math.round(distance * 1000)} м`
+                : `${distance.toFixed(1)} км`}
+            </strong>
           </p>
 
           <div className="hostel-card__info">
