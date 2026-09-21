@@ -1,3 +1,5 @@
+import ssl
+
 from langchain_gigachat import GigaChat
 from langchain_core.messages import HumanMessage, SystemMessage
 from os import getenv
@@ -10,7 +12,8 @@ model = GigaChat(
     credentials=getenv("GIGA_API_KEY"),
     scope="GIGACHAT_API_PERS",
     model="GigaChat-2",
-    verify_ssl_certs=False,
+    verify_ssl_certs=True,
+    ssl_context=ssl.create_default_context(cafile="maxbot/Russian_Trusted_CA.pem"),
     temperature=0,
 )
 

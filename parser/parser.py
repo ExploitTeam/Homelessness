@@ -1,6 +1,6 @@
 from urllib.request import Request, urlopen
-import neural_network
 from database import db_manager, classes
+import parser.neural_network as neural_network
 
 
 def download_html(url: str) -> str:
@@ -31,7 +31,7 @@ def proceed_parsing():
                 open_time, close_time = "", ""
                 additional_info = f"{current_homestay["homestay_type"]}. {current_homestay["work_months"]}."
                 if current_homestay["work_time"] != "":
-                    open_time, close_time = current_homestay["work_time"].split["-"]
+                    open_time, close_time = current_homestay.get("work_time", "").split("-")
                 homestay_object = classes.Homestay(address = current_homestay["address"],
                                                    open_time = open_time,
                                                    close_time = close_time,
@@ -39,5 +39,3 @@ def proceed_parsing():
                                                 )
             
             db_manager.insert_or_update_homestay(homestay_object)
-
-proceed_parsing()

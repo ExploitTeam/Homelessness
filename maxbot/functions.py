@@ -1,5 +1,4 @@
 import os
-
 from database.classes import *
 from maxbot.maxapi import Bot
 from parser.modules import *
@@ -7,6 +6,7 @@ from maxbot.inline_keyboard import *
 from database.db_manager import *
 from dotenv import load_dotenv
 import json
+
 load_dotenv()
 ADMINS = [int(i) for i in os.getenv("MAX_ADMINS_ID", "").split(",")]
 
@@ -15,16 +15,12 @@ start_text = ("Привет{} 👋\n"
               "Нажмите кнопку 'Отправить геопозицию', чтобы посмотреть ближайшие к вам ночлежки.\n\n"
               "Ваш ID: {}.")
 
-def show_all(name=None):
-    # all = get_all_homestays() --- ОПИСАТЬ В db_manager.py!!!!!
-    all = [ # ПРИМЕР НА ВРЕМЯ ОТСУТСТВИЯ РЕАЛЬНОЙ ИНФЫ. УБРАТЬ!
-        Homestay(1, "Улица Пушкина 1", 20, 5, "9:00", "20:00",
-                 1, "Пункт для ночлежки"),
-        Homestay(2, "Улица Ленина 5", -1, -1, "9:00", "20:00",
-                 1, "Пункт бесплатной еды")
-    ]
+def show_all(name=None, get_in_dict=False):
+    all = get_all_homestays()
     if name:
         all = sort_places(all, name)
+    if get_in_dict:
+        return all
     res = ""
     for i in all:
         res += (f"🆔 {i.id}\n"
@@ -99,5 +95,19 @@ async def do_on_start(bot, usr, msg_id = None):
     if msg_id:
         await bot.edit_msg(msg_id, text, keyboard.keyboard)
     else:
-        await bot.send_msg(id, text, keyboard.keyboard)
+        msg_id = (await bot.send_msg(id, text, keyboard.keyboard)).get('message', {}).get('body', {}).get('mid')
+        bot.set_next_step(id,
+                          json.dumps({
+                              "command" : "edit_homestay",
+                              "msg_id" : msg_id
+                          }))
+
     print(text)
+
+def safe_json_loads(string_data):
+    if not string_data:
+        return {}
+    try:
+        return json.loads(string_data)
+    except (ValueError, TypeError):
+        return {}
