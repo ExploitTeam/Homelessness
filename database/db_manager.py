@@ -34,9 +34,10 @@ def initialize_database():
                 username TEXT,
                 user_type INTEGER DEFAULT 0,
                 phone_number TEXT,
-                id_homestay INTEGER
+                id_homestay INTEGER,
+                last_booking TEXT
             )
-        """)
+        """)    
 
         conn.commit()
 
@@ -74,7 +75,8 @@ def get_user(id: int | None = None,
                 username,
                 user_type,
                 phone_number,
-                id_homestay
+                id_homestay,
+                last_booking
             FROM users
             WHERE {" AND ".join(conditions)}
         """
@@ -91,7 +93,8 @@ def get_user(id: int | None = None,
             username=row[1],
             user_type=row[2],
             phone_number=row[3],
-            id_homestay=row[4]
+            id_homestay=row[4],
+            last_booking=row[5]
         )
 
 
@@ -131,7 +134,8 @@ def get_homestay(id : int | None = None,
                     open_time,
                     close_time,
                     is_working,
-                    additional_info
+                    additional_info,
+                    homestay_type
                 FROM homestays
                 WHERE {" AND ".join(conditions)}
             """
@@ -155,41 +159,53 @@ def get_homestay(id : int | None = None,
             )
 
 
-def insert_or_update_user(user : User | None = None):
+def insert_or_update_user(user : User | None = None) -> bool:
     """Добавление или изменения пользователя в БД."""
 
-    if user is not None:
+    if user is None:
+        return False
+
+    try:
         with sqlite3.connect(database_name) as conn:
             conn.execute("PRAGMA foreign_keys = ON")
             cursor = conn.cursor()
 
-            # ИСПРАВЛЕННЫЙ ВАРИАНТ SQL-ЗАПРОСА:
             cursor.execute("""
                 INSERT INTO users (
                     id,
                     username,
                     user_type,
                     phone_number,
-                    id_homestay
-                ) VALUES (?, ?, ?, ?, ?)
+                    id_homestay,
+                    last_booking
+                ) VALUES (?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET 
                     username = excluded.username, 
                     user_type = excluded.user_type,
                     phone_number = excluded.phone_number,
-                    id_homestay = excluded.id_homestay
+                    id_homestay = excluded.id_homestay,
+                    last_booking = excluded.last_booking
             """, (
                 user.id,
                 user.username,
                 user.user_type,
                 user.phone_number,
-                user.id_homestay
+                user.id_homestay,
+                user.last_booking
             ))
+        return True
+
+    except sqlite3.Error:
+        return False
 
 
-def insert_or_update_homestay(homestay : Homestay | None = None):
+def insert_or_update_homestay(homestay : Homestay | None = None) -> bool:
     """Добавление или изменения пользователя в БД."""
 
-    if homestay is not None:
+    if homestay is None:
+        return False
+
+    try:
         with sqlite3.connect(database_name) as conn:
             conn.execute("PRAGMA foreign_keys = ON")
             cursor = conn.cursor()
@@ -197,16 +213,16 @@ def insert_or_update_homestay(homestay : Homestay | None = None):
             if homestay.id == 0:
                 cursor.execute("""
                     INSERT INTO homestays (
-                        id,
                         address,
                         all_beds,
                         available_beds,
                         open_time,
                         close_time,
                         is_working,
-                        additional_info
+                        additional_info,
+                        homestay_type
                     )
-                    VALUES (?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     homestay.address,
                     homestay.all_beds,
@@ -214,16 +230,18 @@ def insert_or_update_homestay(homestay : Homestay | None = None):
                     homestay.open_time,
                     homestay.close_time,
                     homestay.is_working,
-                    homestay.additional_info
+                    homestay.additional_info,
+                    homestay.homestay_type
                 ))
 
                 homestay.id = cursor.lastrowid
+
+                return True
 
             else:
                 cursor.execute("""
                     UPDATE homestays
                     SET
-                        id,
                         address = ?,
                         all_beds = ?,
                         available_beds = ?,
@@ -231,6 +249,7 @@ def insert_or_update_homestay(homestay : Homestay | None = None):
                         close_time = ?,
                         is_working = ?,
                         additional_info = ?
+                        homestay_type = ?
                     WHERE id = ?
                 """, (
                     homestay.address,
@@ -239,7 +258,49 @@ def insert_or_update_homestay(homestay : Homestay | None = None):
                     homestay.open_time,
                     homestay.close_time,
                     homestay.is_working,
-                    homestay.additional_info
+                    homestay.additional_info,
+                    homestay.homestay_type,
+                    homestay.id
                 ))
-def get_all_homestays():
-    pass
+
+                return cursor.rowcount > 0
+
+    except sqlite3.Error:
+        return False
+
+
+def get_all_homestays() -> list[Homestay]:
+    """Возвращает список всех ночлегов из БД."""
+
+    with sqlite3.connect(database_name) as conn:
+        conn.execute("PRAGMA foreign_keys = ON")
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT
+                id,
+                address,
+                all_beds,
+                available_beds,
+                open_time,
+                close_time,
+                is_working,
+                additional_info
+            FROM homestays
+        """)
+
+        rows = cursor.fetchall()
+
+        return [
+            Homestay(
+                id=row[0],
+                address=row[1],
+                all_beds=row[2],
+                available_beds=row[3],
+                open_time=row[4],
+                close_time=row[5],
+                is_working=row[6],
+                additional_info=row[7]
+            )
+            for row in rows
+        ]
