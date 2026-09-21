@@ -71,7 +71,7 @@ class AuthRequest(BaseModel):
     initData: str
 
 
-@app.post("/auth")
+@app.post("/api/auth")
 async def auth_mini_app(payload: AuthRequest):
     """
     Точка входа. Сюда фронтенд отправляет initData при запуске приложения.
@@ -86,7 +86,7 @@ async def auth_mini_app(payload: AuthRequest):
     return {"access_token": token, "token_type": "bearer"}
 
 
-@app.get("/places")
+@app.get("/api/places")
 async def info(user_id: int = Depends(get_current_user_id)):
     """
     Защищенный эндпоинт. Доступен только с валидным JWT-токеном.
@@ -103,7 +103,7 @@ class BookingRequest(BaseModel):
     id_homestay: int
 
 
-@app.post("/book")
+@app.post("/api/book")
 async def book(booking: BookingRequest, user_id: int = Depends(get_current_user_id)):
     """
     Защищенное бронирование места
