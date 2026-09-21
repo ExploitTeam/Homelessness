@@ -1,7 +1,7 @@
 from maxbot.bot_manager import bot, keyboard_to_start
 import json
 from database.db_manager import *
-from maxbot.module import *
+from maxbot.functions import *
 """user settings"""
 
 

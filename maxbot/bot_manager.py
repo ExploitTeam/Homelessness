@@ -1,6 +1,6 @@
 import json
 
-from maxbot.module import *
+from maxbot.functions import *
 from maxbot.inline_keyboard import *
 from maxbot.maxapi import Bot
 import os
@@ -17,7 +17,7 @@ bot = Bot(TOKEN)
 keyboard_to_start = InlineKeyboardMarkup()
 keyboard_to_start.add_button("На главную", button_types.callback, payload="load_start")
 
-from maxbot.settings_router import *
+from maxbot.user_settings import *
 @bot.message_handler(commands=['start'])
 async def only_start(update, bot):
     user = update.get('message', {}).get('sender', {})
