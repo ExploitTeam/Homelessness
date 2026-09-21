@@ -248,7 +248,7 @@ def insert_or_update_homestay(homestay : Homestay | None = None) -> bool:
                         open_time = ?,
                         close_time = ?,
                         is_working = ?,
-                        additional_info = ?
+                        additional_info = ?,
                         homestay_type = ?
                     WHERE id = ?
                 """, (

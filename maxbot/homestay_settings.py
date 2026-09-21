@@ -4,6 +4,74 @@ from database.db_manager import *
 from maxbot.functions import *
 from parser.parser import proceed_parsing
 
+import json
+from database import db_manager, classes
+
+async def do_remove_homestay(user_id: int, homestay_id: int, bot, update):
+    """Удаление пункта размещения"""
+    # Предполагаем, что в db_manager есть метод удаления, либо апдейт статуса
+    db_manager.delete_homestay(id=homestay_id)
+    await bot.send_msg(user_id, f"❌ Пункт с ID {homestay_id} успешно удален из базы данных.")
+
+async def do_change_address(user_id: int, homestay_id: int, bot, update):
+    """Запрос нового адреса"""
+    await bot.send_msg(user_id, f"📝 Введите новый адрес для пункта (ID: {homestay_id}):")
+    bot.set_next_step(user_id, json.dumps({
+        "command": "input_new_address",
+        "target_homestay": homestay_id
+    }))
+
+async def do_edit_places(user_id: int, homestay_id: int, bot, update):
+    """Запрос количества мест"""
+    await bot.send_msg(user_id, f"🔢 Укажите новое общее количество мест для пункта (ID: {homestay_id}):")
+    bot.set_next_step(user_id, json.dumps({
+        "command": "input_new_places",
+        "target_homestay": homestay_id
+    }))
+
+async def do_close_homestay(user_id: int, homestay_id: int, bot, update):
+    """Перевод пункта в статус закрытого (или удаление)"""
+    homestay = db_manager.get_homestay(id=homestay_id)
+    if homestay:
+        homestay.is_working = 1 if not homestay.is_working else 0
+        db_manager.insert_or_update_homestay(homestay)
+        update['callback']['payload'] = json.dumps({"homestay_id" : homestay_id})
+        await edit_one_homestay(update, bot)
+
+async def do_change_work_hours(user_id: int, homestay_id: int, bot, update):
+    """Запрос новых часов работы"""
+    await bot.send_msg(user_id, f"⏰ Введите новые часы работы в формате 'ЧЧ:ММ-ЧЧ:ММ' для пункта (ID: {homestay_id}):")
+    bot.set_next_step(user_id, json.dumps({
+        "command": "input_new_work_hours",
+        "target_homestay": homestay_id
+    }))
+
+async def do_change_description(user_id: int, homestay_id: int, bot, update):
+    """Запрос новой дополнительной информации"""
+    await bot.send_msg(user_id, f"ℹ️ Введите новое описание / доп. информацию для пункта (ID: {homestay_id}):")
+    bot.set_next_step(user_id, json.dumps({
+        "command": "input_new_description",
+        "target_homestay": homestay_id
+    }))
+
+async def do_change_type(user_id: int, homestay_id: int, bot, update):
+    """Запрос нового типа пункта"""
+    await bot.send_msg(user_id, f"⛺️ Введите новый тип пункта (например: Хостел, Отель, Глэмпинг) для ID {homestay_id}:")
+    bot.set_next_step(user_id, json.dumps({
+        "command": "input_new_type",
+        "target_homestay": homestay_id
+    }))
+
+HOMESTAY_ACTIONS = {
+    "remove_homestay": do_remove_homestay,
+    "change_address": do_change_address,
+    "edit_places": do_edit_places,
+    "close_homestay": do_close_homestay,
+    "change_work_hours": do_change_work_hours,
+    "change_description_homestay": do_change_description,
+    "change_type_homestay": do_change_type
+}
+
 @bot.message_handler(func=lambda msg, tp:
 msg.get("callback", {}).get("payload", "") == "edit_homestay")
 async def edit_user_button_pressed(update, bot):
@@ -22,11 +90,65 @@ async def edit_user_button_pressed(update, bot):
         keyboard.add_button(f"📍 {i.address}",
                             button_types.callback,
                             payload=json.dumps({
-                                "command": "edit_homestay",
+                                "command": "edit_one_homestay",
                                 "homestay_id": i.id
                             }))
     msg_id = update.get('message', {}).get('body', {}).get('mid', "")
     await bot.edit_msg(msg_id, f"Добавьте новый пункт или отредактируйте существующий 👇", keyboard.keyboard)
+
+@bot.message_handler(func=lambda msg, tp:
+json.loads(msg.get("callback", {}).get("payload", "")).get("command", "") == "edit_one_homestay")
+async def edit_one_homestay(update, bot):
+    keyboard = InlineKeyboardMarkup()
+    user = update.get('callback', {}).get('user', {})
+    id = user.get('user_id', {})
+    homestay_id = json.loads(update.get("callback", {}).get("payload", "")).get("homestay_id", -1)
+    msg_id = update.get('message', {}).get('body', {}).get('mid', "")
+    homestay = get_homestay(homestay_id)
+    usr = get_user(id_homestay=homestay_id)
+    usr_info_homestay = ""
+    if not usr:
+        usr_info_homestay = "Нет менеджера"
+    else:
+        usr_info_homestay = usr
+    keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
+    keyboard.add_button("❌ Удалить пункт", button_types.callback,payload=json.dumps(
+        {"command": "remove_homestay", "homestay_id": homestay_id}
+    ))
+    keyboard.add_button("Изменить адрес", button_types.callback, payload=json.dumps(
+        {"command": "change_address", "homestay_id": homestay_id}
+    ))
+    keyboard.add_button("Редактировать места", button_types.callback, payload=json.dumps(
+        {"command": "edit_places", "homestay_id": homestay_id}
+    ))
+    keyboard.add_button("Закрыть" if homestay.is_working else "Открыть", button_types.callback, payload=json.dumps(
+        {"command": "close_homestay", "homestay_id": homestay_id}
+    ))
+    keyboard.add_button("Изменить часы работы", button_types.callback, payload=json.dumps(
+        {"command": "change_work_hours", "homestay_id": homestay_id}
+    ))
+    keyboard.add_button("Изменить дополнительную информацию", button_types.callback, payload=json.dumps(
+        {"command": "change_description_homestay", "homestay_id": homestay_id}
+    ))
+    keyboard.add_button("Изменить тип пункта", button_types.callback, payload=json.dumps(
+        {"command": "change_type_homestay", "homestay_id": homestay_id}
+    ))
+
+    await bot.edit_msg(msg_id, f"Информация о пункте:\n{homestay}\n\nМенеджер:\n{usr_info_homestay}", keyboard.keyboard)
+
+@bot.message_handler(func=lambda msg, tp:
+safe_json_loads(msg.get("callback", {}).get("payload", "")).get("command") in HOMESTAY_ACTIONS
+                     )
+async def handle_homestay_management(update, bot):
+    payload = safe_json_loads(update.get("callback", {}).get("payload", ""))
+    command = payload.get("command")
+    homestay_id = int(payload.get("homestay_id", 0))
+    sender_id = update.get('callback', {}).get('user', {}).get('user_id', 0)
+
+    if not homestay_id or not sender_id:
+        return
+    action_func = HOMESTAY_ACTIONS[command]
+    await action_func(sender_id, homestay_id, bot, update)
 
 @bot.message_handler(func=lambda msg, tp:
 msg.get("callback", {}).get("payload", "") == "update_db")
@@ -35,3 +157,5 @@ async def update_db(update, bot):
     await bot.edit_msg(msg_id, f"🔄 Обновление данных... Пожалуйста, ждите.")
     proceed_parsing()
     await edit_user_button_pressed(update, bot)
+
+
