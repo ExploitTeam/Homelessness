@@ -1,6 +1,7 @@
 import os
 
 from database.classes import *
+from maxbot.maxapi import Bot
 from parser.modules import *
 from maxbot.inline_keyboard import *
 from database.db_manager import *
@@ -8,6 +9,12 @@ from dotenv import load_dotenv
 import json
 load_dotenv()
 ADMINS = [int(i) for i in os.getenv("MAX_ADMINS_ID", "").split(",")]
+
+start_text = ("Привет{} 👋\n"
+              "Это бот, который поможет вам найти место, где можно согреться или переночевать.\n"
+              "Нажмите кнопку 'Отправить геопозицию', чтобы посмотреть ближайшие к вам ночлежки.\n\n"
+              "Ваш ID: {}.")
+
 def show_all(name=None):
     # all = get_all_homestays() --- ОПИСАТЬ В db_manager.py!!!!!
     all = [ # ПРИМЕР НА ВРЕМЯ ОТСУТСТВИЯ РЕАЛЬНОЙ ИНФЫ. УБРАТЬ!
@@ -31,8 +38,16 @@ def show_all(name=None):
                "Зайдите немного позже, возможно, ситуация изменится.")
     return res
 
-def generate_buttons_by_user_privilege(usr, msg_id):
+def generate_buttons_by_user_privilege(usr, msg_id, no_edit=False):
     keyboard = InlineKeyboardMarkup()
+    keyboard.add_button("Изменить номер", button_types.callback, payload=json.dumps({
+        "command": "change_number",
+        "user": usr.id,
+        "msg_id": msg_id
+    }))
+    if no_edit:
+        return keyboard
+
     if usr.user_type != 2:
         keyboard.add_button("Сделать админом", button_types.callback, payload=json.dumps({
             "command": "set_admin",
@@ -60,7 +75,7 @@ def generate_buttons_by_user_privilege(usr, msg_id):
     return keyboard
 
 
-async def do_on_start(bot, usr):
+async def do_on_start(bot, usr, msg_id = None):
     global start_text
     name = usr.get('first_name', None)
     id = usr.get('user_id', None)
@@ -81,5 +96,8 @@ async def do_on_start(bot, usr):
 
     keyboard.add_button("Отправить геопозицию", button_types.request_geo_location, payload="send_geo")
     keyboard.add_button("Открыть мини приложение", button_types.callback, payload="open_mini_app")
-    await bot.send_msg(id, text, keyboard.keyboard)
+    if msg_id:
+        await bot.edit_msg(msg_id, text, keyboard.keyboard)
+    else:
+        await bot.send_msg(id, text, keyboard.keyboard)
     print(text)

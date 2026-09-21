@@ -104,13 +104,13 @@ class Bot:
             if text and text.startswith('/'):
                 command = text.split()[0][1:]
                 if command in self.command_handlers:
-                    await self.command_handlers[command](update)
+                    await self.command_handlers[command](update, self)
                     return
 
         for filter_func, handler_func in self.text_handlers:
             try:
                 if filter_func(update, tp):
-                    await handler_func(update)
+                    await handler_func(update, self)
             except Exception as filter_err:
                 print(f"Ошибка в фильтре: {filter_err}")
                 continue
