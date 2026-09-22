@@ -35,7 +35,7 @@ def show_all(name=None, get_in_dict=False):
                "Зайдите немного позже, возможно, ситуация изменится.")
     return res
 
-def generate_buttons_by_user_privilege(usr, msg_id, no_edit=False):
+def generate_buttons_by_user_privilege(usr, msg_id, me, no_edit=False):
     keyboard = InlineKeyboardMarkup()
     keyboard.add_button("Изменить номер", button_types.callback, payload=json.dumps({
         "command": "change_number",
@@ -45,25 +45,25 @@ def generate_buttons_by_user_privilege(usr, msg_id, no_edit=False):
     if no_edit:
         return keyboard
 
-    if usr.user_type != 2:
+    if usr.user_type != 2 and usr.id != me and usr.id not in ADMINS:
         keyboard.add_button("Сделать админом", button_types.callback, payload=json.dumps({
             "command": "set_admin",
             "user": usr.id,
             "msg_id": msg_id
         }))
-    if usr.user_type != 1:
+    if usr.user_type != 1 and usr.id != me and usr.id not in ADMINS:
         keyboard.add_button("Сделать менеджером", button_types.callback, payload=json.dumps({
             "command": "set_manager",
             "user": usr.id,
             "msg_id": msg_id
         }))
-    if usr.user_type != 0:
+    if usr.user_type != 0 and usr.id != me and usr.id not in ADMINS:
         keyboard.add_button("Отнять привилегии", button_types.callback, payload=json.dumps({
             "command": "restrict_user",
             "user": usr.id,
             "msg_id": msg_id
         }))
-    if usr.user_type == 1:
+    if usr.user_type in [1, 2]:
         keyboard.add_button("Привязать к пункту", button_types.callback, payload=json.dumps({
             "command": "attach_to_point",
             "user": usr.id,

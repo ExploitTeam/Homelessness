@@ -16,6 +16,8 @@ distro==1.9.0
 dotenv==0.9.9
 fastapi==0.141.1
 frozenlist==1.8.0
+geographiclib==2.1
+geopy==2.5.0
 gigachat==0.2.3
 h11==0.16.0
 httpcore==1.0.9

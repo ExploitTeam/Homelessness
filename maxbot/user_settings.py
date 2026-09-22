@@ -1,8 +1,10 @@
-from maxbot.bot_manager import bot, keyboard_to_start
+from maxbot.bot_manager import bot, keyboard_to_start, ADMINS
 import json
 from database.db_manager import *
 from maxbot.functions import *
+
 """user settings"""
+
 
 @bot.message_handler(func=lambda msg, tp:
 msg.get("callback", {}).get("payload", "") == "edit_user")
@@ -10,8 +12,32 @@ async def edit_user_button_pressed(update, bot):
     user = update.get('callback', {}).get('user', {})
     id = user.get('user_id', {})
     msg_id = update.get('message', {}).get('body', {}).get('mid', "")
+
+    current_usr = get_user(id)
+
+    # Если пользователь — менеджер и при этом НЕ входит в глобальный список ADMINS
+    if current_usr and getattr(current_usr, 'user_type', 0) == 1 and id not in ADMINS:
+        usr = current_usr
+        res = await bot.send_msg(id, f"Информация о пользователе:\n{usr}")
+
+        keyboard = generate_buttons_by_user_privilege(
+            usr,
+            res.get('message', {}).get('body', {}).get('mid'),
+            id,
+            no_edit=False
+        )
+        keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
+        await bot.edit_msg(
+            res.get('message', {}).get('body', {}).get('mid'),
+            f"Информация о пользователе:\n{usr}",
+            keyboard.keyboard
+        )
+        return
+
+    # Для администраторов, пользователей из ADMINS и остальных уровней запрашиваем ID для редактирования
     bot.set_next_step(id, "set_user_for_edit")
-    await bot.edit_msg(msg_id, f"Введите ID пользователя для редактирования. ID видно в этом боте в главном меню.", keyboard_to_start.keyboard)
+    await bot.edit_msg(msg_id, f"Введите ID пользователя для редактирования. ID видно в этом боте в главном меню.",
+                       keyboard_to_start.keyboard)
 
 
 @bot.message_handler(func=lambda msg, tp:
@@ -34,14 +60,13 @@ async def set_user_for_edit(update, bot):
 
     res = await bot.send_msg(id, f"Информация о пользователе:\n{usr}")
     keyboard = InlineKeyboardMarkup()
-    if usr.id == id:
-        keyboard = generate_buttons_by_user_privilege(usr,
-                                                      res.get('message', {}).get('body', {}).get('mid'),
-                                                      no_edit=False)
-    else:
-        keyboard = generate_buttons_by_user_privilege(usr,
-                                                      res.get('message', {}).get('body', {}).get('mid'),
-                                                      no_edit=False)
+
+    keyboard = generate_buttons_by_user_privilege(
+        usr,
+        res.get('message', {}).get('body', {}).get('mid'),
+        id,
+        no_edit=False
+    )
     keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
     await bot.edit_msg(res.get('message', {}).get('body', {}).get('mid'),
                        f"Информация о пользователе:\n{usr}",
@@ -53,14 +78,27 @@ async def set_user_for_edit(update, bot):
 
 @bot.message_handler(func=lambda msg, tp:
 safe_json_loads(msg.get("callback", {}).get("payload", "")
-           ).get("command", " ") in ["set_admin", "set_manager", "restrict_user"])
+                ).get("command", " ") in ["set_admin", "set_manager", "restrict_user"])
 async def set_manager(update, bot):
+    sender_id = update.get('callback', {}).get('user', {}).get('user_id', 0)
     current_task = update.get("callback", {}).get("payload", "")
     if not current_task:
         return
     current_task = safe_json_loads(current_task)
     usr_id = int(current_task.get("user", 0))
     msg_id = update.get('message', {}).get('body', {}).get('mid', "")
+
+    current_usr = get_user(sender_id)
+    is_manager = current_usr and getattr(current_usr, 'user_type', 0) == 1
+
+    # Менеджеры (не из ADMINS) не могут менять типы учетных записей
+    if is_manager and sender_id not in ADMINS:
+        return
+
+        # Никто (даже админы) не может менять тип учетной записи самому себе
+    if sender_id == usr_id:
+        return
+
     usr = get_user(usr_id)
     if current_task["command"] == "set_admin":
         usr.user_type = 2
@@ -71,14 +109,15 @@ async def set_manager(update, bot):
     if current_task["command"] == "restrict_user":
         usr.user_type = 0
         insert_or_update_user(usr)
-    keyboard = generate_buttons_by_user_privilege(usr, msg_id)
+
+    keyboard = generate_buttons_by_user_privilege(usr, msg_id, sender_id)
     keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
     await bot.edit_msg(msg_id, f"Информация о пользователе:\n{usr}", keyboard.keyboard)
 
 
 @bot.message_handler(func=lambda msg, tp:
 safe_json_loads(msg.get("callback", {}).get("payload", "")
-           ).get("command", " ") == "attach_to_point")
+                ).get("command", " ") == "attach_to_point")
 async def attach_to_point(update, bot):
     sender_id = update.get('callback', {}).get('user', {}).get('user_id', 0)
     current_task = update.get("callback", {}).get("payload", "")
@@ -88,7 +127,7 @@ async def attach_to_point(update, bot):
     current_task = safe_json_loads(current_task)
     id_usr = int(current_task.get("user", 0))
     await bot.edit_msg(msg_id, f"К какому пункту привязать пользователя?\n"
-                                  f"Список всех доступных пунктов:\n{show_all()}", keyboard_to_start.keyboard)
+                               f"Список всех доступных пунктов:\n{show_all()}", keyboard_to_start.keyboard)
     bot.set_next_step(sender_id, json.dumps({
         "command": "input_point_to_attach",
         "target_user": id_usr
@@ -124,7 +163,7 @@ async def input_point_to_attach(update, bot):
     usr.id_homestay = text
     insert_or_update_user(usr)
     res = await bot.send_msg(sender_id, f".")
-    keyboard = generate_buttons_by_user_privilege(usr, res.get('message', {}).get('body', {}).get('mid'))
+    keyboard = generate_buttons_by_user_privilege(usr, res.get('message', {}).get('body', {}).get('mid'), sender_id)
     keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
     await bot.edit_msg(res.get('message', {}).get('body', {}).get('mid'),
                        f"Даныые пользователя успешно обновлены!\n{usr}",
@@ -137,7 +176,7 @@ async def input_point_to_attach(update, bot):
 
 @bot.message_handler(func=lambda msg, tp:
 safe_json_loads(msg.get("callback", {}).get("payload", "")
-           ).get("command", " ") == "change_number")
+                ).get("command", " ") == "change_number")
 async def edit_number(update, bot):
     sender_id = update.get('callback', {}).get('user', {}).get('user_id', 0)
     msg_id = update.get('message', {}).get('body', {}).get('mid', "")
@@ -171,7 +210,7 @@ async def input_new_number(update, bot):
     usr.phone_number = text
     insert_or_update_user(usr)
     res = await bot.send_msg(sender_id, f".")
-    keyboard = generate_buttons_by_user_privilege(usr, res.get('message', {}).get('body', {}).get('mid'))
+    keyboard = generate_buttons_by_user_privilege(usr, res.get('message', {}).get('body', {}).get('mid'), sender_id)
     keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
     await bot.edit_msg(res.get('message', {}).get('body', {}).get('mid'),
                        f"Даныые пользователя успешно обновлены!\n{usr}",
