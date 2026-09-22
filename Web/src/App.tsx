@@ -40,7 +40,7 @@ function App() {
     hostels,
     loading: hostelsLoading,
     error: hostelsError,
-  } = useHostels(mapLocation);
+  } = useHostels();
 
   const handleHostelClick = useCallback(
     (hostel: Hostel) => {
@@ -68,7 +68,6 @@ function App() {
       try {
         const result = await bookHostel({
           hostelId,
-          userLocation: mapLocation,
         });
 
         if (!result.success) {
@@ -109,7 +108,7 @@ function App() {
         }, 4000);
       }
     },
-    [bookedHostelIds, mapLocation]
+    [bookedHostelIds]
   );
 
   return (
