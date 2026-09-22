@@ -127,6 +127,21 @@ async def do_change_type(user_id: int, homestay_id: int, bot, update):
     }))
 
 
+async def do_add_homestay(user_id: int, homestay_id: int, bot, update):
+    """Начало процесса создания нового пункта"""
+    keyboard = InlineKeyboardMarkup()
+    keyboard.add_button("❌ Отмена", button_types.callback, "edit_homestay")
+
+    await bot.send_msg(user_id,
+                       "🏠 Начинаем добавление нового пункта.\n\n"
+                       "Шаг 1: Введите полный географический адрес объекта (например: Санкт-Петербург, ул. Ленина, д. 5):",
+                       keyboard.keyboard)
+
+    bot.set_next_step(user_id, json.dumps({
+        "command": "create_input_address"
+    }))
+
+
 HOMESTAY_ACTIONS = {
     "remove_homestay": do_remove_homestay,
     "change_address": do_change_address,
@@ -135,7 +150,8 @@ HOMESTAY_ACTIONS = {
     "change_work_hours": do_change_work_hours,
     "change_description_homestay": do_change_description,
     "change_type_homestay": do_change_type,
-    "update_location": update_location
+    "update_location": update_location,
+    "add_homestay": do_add_homestay
 }
 
 
@@ -163,8 +179,6 @@ async def input_new_address(update, bot):
         db_manager.insert_or_update_homestay(homestay)
         bot.clear_next_step(sender_id)
 
-        update['callback'] = {'payload': json.dumps({"homestay_id": homestay_id}), 'user': {'user_id': sender_id}}
-        await edit_one_homestay(update, bot)
     await edit_one_homestay(update, bot, True)
 
 
@@ -189,9 +203,6 @@ async def input_new_places(update, bot):
         homestay.available_beds = places_count
         db_manager.insert_or_update_homestay(homestay)
         bot.clear_next_step(sender_id)
-
-        update['callback'] = {'payload': json.dumps({"homestay_id": homestay_id}), 'user': {'user_id': sender_id}}
-        await edit_one_homestay(update, bot)
     await edit_one_homestay(update, bot, True)
 
 
@@ -221,9 +232,6 @@ async def input_new_work_hours(update, bot):
         homestay.close_time = close_time.strip()
         db_manager.insert_or_update_homestay(homestay)
         bot.clear_next_step(sender_id)
-
-        update['callback'] = {'payload': json.dumps({"homestay_id": homestay_id}), 'user': {'user_id': sender_id}}
-        await edit_one_homestay(update, bot)
     await edit_one_homestay(update, bot, True)
 
 
@@ -246,9 +254,6 @@ async def input_new_description(update, bot):
         homestay.additional_info = text
         db_manager.insert_or_update_homestay(homestay)
         bot.clear_next_step(sender_id)
-
-        update['callback'] = {'payload': json.dumps({"homestay_id": homestay_id}), 'user': {'user_id': sender_id}}
-        await edit_one_homestay(update, bot)
     await edit_one_homestay(update, bot, True)
 
 
@@ -270,11 +275,85 @@ async def input_new_type(update, bot):
         homestay.homestay_type = text
         db_manager.insert_or_update_homestay(homestay)
         bot.clear_next_step(sender_id)
-
-        update['callback'] = {'payload': json.dumps({"homestay_id": homestay_id}), 'user': {'user_id': sender_id}}
-        await edit_one_homestay(update, bot)
     await edit_one_homestay(update, bot, True)
 
+# =====================================================================
+# Создание нового пункта
+# =====================================================================
+
+
+@bot.message_handler(func=lambda msg, tp: safe_json_loads(
+    bot.get_next_step(msg.get("message", {}).get("sender", {}).get("user_id", 0))).get(
+    "command") == "create_input_beds")
+async def create_input_beds(update, bot):
+    """Шаг 3: Получаем места, ищем координаты и сохраняем пункт в БД"""
+    sender_id = update.get('message', {}).get('sender', {}).get('user_id', 0)
+    beds_text = update.get("message", {}).get("body", {}).get('text', "").strip()
+
+    step_data = safe_json_loads(bot.get_next_step(sender_id))
+    address_text = step_data.get("address")
+
+    keyboard = InlineKeyboardMarkup()
+    keyboard.add_button("❌ Отмена", button_types.callback, "edit_homestay")
+    try:
+        beds_count = int(beds_text)
+    except ValueError:
+        await bot.send_msg(sender_id, "⚠️ Пожалуйста, введите корректное число мест цифрами:",
+                           keyboard.keyboard)
+        return
+
+    lat, lon = (0.0, 0.0)
+    try:
+        lat, lon = coordinates_finder_v2.get_coordinates(address_text)
+    except Exception as e:
+        print(f"Ошибка при первичном поиске координат: {e}")
+
+    new_homestay = classes.Homestay(
+        address=address_text,
+        all_beds=beds_count,
+        available_beds=beds_count,
+        open_time="00:00",
+        close_time="00:00",
+        is_working=1,
+        additional_info="Новый пункт, добавленный вручную.",
+        homestay_type=0
+    )
+
+    new_homestay.latitude = lat
+    new_homestay.longtitude = lon
+
+    db_manager.insert_or_update_homestay(new_homestay)
+    bot.clear_next_step(sender_id)
+    keyboard = InlineKeyboardMarkup()
+    keyboard.add_button(f"Далее", button_types.callback, "edit_homestay")
+    await bot.send_msg(sender_id,
+                       f"✅ Пункт успешно создан!\n\n"
+                       f"ID в системе: {new_homestay.id}\n"
+                       f"Адрес: {address_text}\n"
+                       f"Координаты: {lat}, {lon}", keyboard.keyboard)
+
+
+@bot.message_handler(func=lambda msg, tp: safe_json_loads(
+    bot.get_next_step(msg.get("message", {}).get("sender", {}).get("user_id", 0))).get(
+    "command") == "create_input_address")
+async def create_input_address(update, bot):
+    """Шаг 2: Получаем адрес и запрашиваем количество мест"""
+    sender_id = update.get('message', {}).get('sender', {}).get('user_id', 0)
+    address_text = update.get("message", {}).get("body", {}).get('text', "").strip()
+    keyboard = InlineKeyboardMarkup()
+    keyboard.add_button("❌ Отмена", button_types.callback, "edit_homestay")
+    if not address_text:
+        await bot.send_msg(sender_id, "⚠️ Адрес не может быть пустым. Введите адрес:", keyboard.keyboard)
+        return
+
+    await bot.send_msg(sender_id,
+                       f"📍 Адрес записан: {address_text}\n\nШаг 2: Введите общее количество доступных спальных мест (цифрой):",
+                       keyboard.keyboard)
+
+    bot.set_next_step(sender_id, json.dumps({
+        "command": "create_input_beds",
+        "address": address_text
+    }))
 
 # =====================================================================
 # НАЧАЛО БЛОКА: ОСНОВНЫЕ ИНТЕРФЕЙСНЫЕ МЕТОДЫ КНОПОК
@@ -282,7 +361,7 @@ async def input_new_type(update, bot):
 
 @bot.message_handler(func=lambda msg, tp:
 msg.get("callback", {}).get("payload", "") == "edit_homestay")
-async def edit_user_button_pressed(update, bot):
+async def edit_user_button_pressed(update, bot, send_new = False):
     user = update.get('callback', {}).get('user', {})
     id = user.get('user_id', {})
     all_homestays = show_all(get_in_dict=True)
@@ -302,7 +381,10 @@ async def edit_user_button_pressed(update, bot):
                                 "homestay_id": i.id
                             }))
     msg_id = update.get('message', {}).get('body', {}).get('mid', "")
-    await bot.edit_msg(msg_id, f"Добавьте новый пункт или отредактируйте существующий 👇", keyboard.keyboard)
+    if send_new:
+        await bot.send_msg(id, f"Добавьте новый пункт или отредактируйте существующий 👇", keyboard.keyboard)
+    else:
+        await bot.edit_msg(msg_id, f"Добавьте новый пункт или отредактируйте существующий 👇", keyboard.keyboard)
 
 @bot.message_handler(func=lambda msg, tp:
 json.loads(msg.get("callback", {}).get("payload", "")).get("command", "") == "edit_one_homestay")
@@ -351,16 +433,12 @@ async def edit_one_homestay(update, bot, send_new = False):
         await bot.send_msg(id, f"Информация о пункте:\n{homestay}\n\nМенеджер:\n{usr_info_homestay}", keyboard.keyboard)
 
 @bot.message_handler(func=lambda msg, tp:
-safe_json_loads(msg.get("callback", {}).get("payload", "")).get("command") in HOMESTAY_ACTIONS
-                     )
+safe_json_loads(msg.get("callback", {}).get("payload", "")).get("command") in HOMESTAY_ACTIONS)
 async def handle_homestay_management(update, bot):
     payload = safe_json_loads(update.get("callback", {}).get("payload", ""))
     command = payload.get("command")
     homestay_id = int(payload.get("homestay_id", 0))
     sender_id = update.get('callback', {}).get('user', {}).get('user_id', 0)
-
-    if not homestay_id or not sender_id:
-        return
     action_func = HOMESTAY_ACTIONS[command]
     await action_func(sender_id, homestay_id, bot, update)
 

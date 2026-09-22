@@ -6,40 +6,42 @@ geolocator = Nominatim(user_agent="HomelessnessMaxBotApp/1.0 (your-email@gmail.c
 
 
 def normalize_address(address: str) -> str:
-    """Приводит сокращения адресов к полному виду, который гарантированно понимает Nominatim"""
-    # Переводим в нижний регистр для удобства замен
-    addr = address.lower()
+    """Улучшенная очистка адреса для гарантированного поиска в OSM"""
+    addr = " ".join(address.lower().split()).strip()
+    garbage_words = ["город ", "г. ", "область ", "обл. "]
+    for word in garbage_words:
+        if addr.startswith(word):
+            addr = addr[len(word):].strip()
 
-    # Словарь замен сокращений на полные слова
     replacements = {
         "пр. девят": "проспект девят",
         "пр-кт ": "проспект ",
         "ул. ": "улица ",
-        "г. ": "город ",
         "пер. ": "переулок ",
         "б-р ": "бульвар ",
         " наб. ": " набережная "
     }
-
     for short, full in replacements.items():
         addr = addr.replace(short, full)
+    if "," not in addr:
+        if addr.startswith("москва "):
+            addr = addr.replace("москва ", "москва, ", 1)
+        elif addr.startswith("санкт-петербург "):
+            addr = addr.replace("санкт-петербург ", "санкт-петербург, ", 1)
 
-    # Возвращаем строку, сделав первую букву заглавной (капитализация)
     return addr.strip().capitalize()
 
 
 def get_coordinates(address: str) -> tuple[float, float]:
-    # 1. Очищаем от мусорных пробелов и переносов строк \n
     clean_address = " ".join(address.split()).strip()
     if not clean_address:
         return (0.0, 0.0)
 
-    # 2. Нормализуем сокращения ("пр." -> "проспект")
     ready_address = normalize_address(clean_address)
     print(f"🔍 Отправляем в геокодер нормализованный адрес: '{ready_address}'")
 
     try:
-        time.sleep(1.0)  # Задержка по правилам OSM
+        time.sleep(1.0)
         location = geolocator.geocode(ready_address, timeout=10, language="ru")
 
         if location:
@@ -49,7 +51,6 @@ def get_coordinates(address: str) -> tuple[float, float]:
     except Exception as e:
         print(f"⚠️ Ошибка сети геокодера: {e}")
 
-    # 3. Резервный фолбек, чтобы база данных не оставалась пустой
     print(f"❌ Не удалось найти на карте даже после нормализации. Ставим дефолтный центр города.")
     if "санкт-петербург" in ready_address.lower() or "спб" in ready_address.lower():
         return (59.9343, 30.3351)  # Центр СПб

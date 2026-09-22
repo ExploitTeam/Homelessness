@@ -1,4 +1,7 @@
+import warnings
+
 from database.classes import Homestay, User
+from database.info import info
 import sqlite3
 from os import getenv
 from dotenv import load_dotenv
@@ -53,7 +56,10 @@ def initialize_database():
             )
         """)    
 
-        conn.commit()
+        #Обновление точек:
+        for i in get_all_homestays():
+            insert_or_update_homestay(i)
+        info("База данных инициализирована. ")
 
 
 def get_user(id: int | None = None,
