@@ -87,7 +87,7 @@ class Homestay:
         if usr:
             name = usr.username
         return (f"📍 Адрес: {self.address}\n"
-                f"🔵 Тип: {HomestayTypes.homestay_type.label() if self.homestay_type else '-'}\n"
+                f"🔵 Тип: {HomestayTypes.homestay_type.label if self.homestay_type else '-'}\n"
                 f"😎 Менеджер: {name if name else 'n/a'}\n"
                 f"👤 Всего мест: {self.all_beds}\n"
                 f"👤 Свободно: {self.available_beds}\n"
