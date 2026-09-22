@@ -54,6 +54,8 @@ export interface BackendPlace {
   is_working: number;
   additional_info: string | null;
   homestay_type: number;
+
+  // ИМЕННО названия из твоей БД
   longtitude: number | null;
   latitude: number | null;
 }
@@ -80,6 +82,8 @@ export async function getHostels(): Promise<BackendPlace[]> {
   }
 
   const data: PlacesResponse = await response.json();
+
+  console.log("PLACES FROM SERVER:", data);
 
   return data.places;
 }
