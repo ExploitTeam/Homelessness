@@ -24,7 +24,9 @@ def initialize_database():
                 close_time TEXT NOT NULL DEFAULT "",
                 is_working INTEGER DEFAULT 0,
                 additional_info TEXT,
-                homestay_type INT DEFAULT 0
+                homestay_type INT DEFAULT 0,
+                longtitude REAL,
+                latitude REAL
             )
         """)
 
@@ -135,7 +137,9 @@ def get_homestay(id : int | None = None,
                     close_time,
                     is_working,
                     additional_info,
-                    homestay_type
+                    homestay_type,
+                    longtitude,
+                    latitude
                 FROM homestays
                 WHERE {" AND ".join(conditions)}
             """
@@ -155,7 +159,9 @@ def get_homestay(id : int | None = None,
                 open_time=row[4],
                 close_time=row[5],
                 is_working=row[6],
-                additional_info=row[7]
+                additional_info=row[7],
+                longtitude=row[8],
+                latitude=row[9]
             )
 
 
@@ -220,9 +226,11 @@ def insert_or_update_homestay(homestay : Homestay | None = None) -> bool:
                         close_time,
                         is_working,
                         additional_info,
-                        homestay_type
+                        homestay_type,
+                        longtitude,
+                        latitude
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     homestay.address,
                     homestay.all_beds,
@@ -231,7 +239,9 @@ def insert_or_update_homestay(homestay : Homestay | None = None) -> bool:
                     homestay.close_time,
                     homestay.is_working,
                     homestay.additional_info,
-                    homestay.homestay_type
+                    homestay.homestay_type,
+                    homestay.longtitude,
+                    homestay.latitude
                 ))
 
                 homestay.id = cursor.lastrowid
@@ -249,7 +259,9 @@ def insert_or_update_homestay(homestay : Homestay | None = None) -> bool:
                         close_time = ?,
                         is_working = ?,
                         additional_info = ?,
-                        homestay_type = ?
+                        homestay_type = ?,
+                        longtitude = ?,
+                        latitude = ?
                     WHERE id = ?
                 """, (
                     homestay.address,
@@ -260,6 +272,8 @@ def insert_or_update_homestay(homestay : Homestay | None = None) -> bool:
                     homestay.is_working,
                     homestay.additional_info,
                     homestay.homestay_type,
+                    homestay.longtitude,
+                    homestay.latitude,
                     homestay.id
                 ))
 
@@ -285,7 +299,9 @@ def get_all_homestays() -> list[Homestay]:
                 open_time,
                 close_time,
                 is_working,
-                additional_info
+                additional_info,
+                longtitude,
+                latitude
             FROM homestays
         """)
 
@@ -300,7 +316,52 @@ def get_all_homestays() -> list[Homestay]:
                 open_time=row[4],
                 close_time=row[5],
                 is_working=row[6],
-                additional_info=row[7]
+                additional_info=row[7],
+                longtitude=row[8],
+                latitude=row[9]
             )
             for row in rows
         ]
+
+def delete_user(user: User | None = None) -> bool:
+    """Удаляет пользователя из БД."""
+
+    if user is None:
+        return False
+
+    try:
+        with sqlite3.connect(database_name) as conn:
+            conn.execute("PRAGMA foreign_keys = ON")
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                DELETE FROM users
+                WHERE id = ?
+            """, (user.id,))
+
+            return cursor.rowcount > 0
+
+    except sqlite3.Error:
+        return False
+
+
+def delete_homestay(homestay: Homestay | None = None) -> bool:
+    """Удаляет ночлег из БД."""
+
+    if homestay is None:
+        return False
+
+    try:
+        with sqlite3.connect(database_name) as conn:
+            conn.execute("PRAGMA foreign_keys = ON")
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                DELETE FROM homestays
+                WHERE id = ?
+            """, (homestay.id,))
+
+            return cursor.rowcount > 0
+
+    except sqlite3.Error:
+        return False

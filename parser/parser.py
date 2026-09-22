@@ -31,7 +31,7 @@ def proceed_parsing():
                 open_time, close_time = "", ""
                 additional_info = f"{current_homestay["homestay_type"]}. {current_homestay["work_months"]}."
                 if current_homestay["work_time"] != "":
-                    open_time, close_time = current_homestay.get("work_time", "").split("-")
+                    open_time, close_time = current_homestay["work_time"].split("-")
                 homestay_object = classes.Homestay(address = current_homestay["address"],
                                                    open_time = open_time,
                                                    close_time = close_time,

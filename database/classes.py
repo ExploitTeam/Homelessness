@@ -1,3 +1,5 @@
+from parser import coordinates_finder
+
 class User:
     def __init__(self, id : int = 0, username : str | None = None,
                  user_type : int = 0, phone_number : str | None = None,
@@ -37,7 +39,8 @@ class Homestay:
                  all_beds: int = 0, available_beds : int = 0,
                  open_time : str | None = None, close_time : str | None = None,
                  is_working : int = 0, additional_info : str | None = None,
-                 homestay_type : int | None = None):
+                 homestay_type : int | None = None,
+                 longtitude : float | None = None, latitude : float | None = None):
         self.id = id
         self.address = address
         self.all_beds = all_beds
@@ -47,6 +50,13 @@ class Homestay:
         self.is_working = is_working
         self.additional_info = additional_info
         self.homestay_type = homestay_type
+
+        if longtitude is None and latitude is None:
+            self.latitude, self.longtitude = coordinates_finder.get_coordinates(address)
+        else:
+            self.latitude = latitude
+            self.longtitude = longtitude
+        
 
     def __str__(self):
         from database.db_manager import get_user
@@ -62,3 +72,4 @@ class Homestay:
                 f"⏳ Часы работы: {self.open_time} - {self.close_time}\n"
                 f"{'🟢  Работает' if self.is_working else '🔴  Закрыто'}\n"
                 f"❗️ Дополнительная информация: {self.additional_info if self.additional_info else 'отсутствует'}\n") # Дописать!!!!
+
