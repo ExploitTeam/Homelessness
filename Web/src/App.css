@@ -1,0 +1,618 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+body {
+  background: #f5f5f5;
+}
+
+button {
+  font: inherit;
+}
+
+.app {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* =========================
+   HOSTEL CARD
+   ========================= */
+
+.hostel-card {
+  position: fixed;
+  z-index: 1000;
+
+  left: 50%;
+  bottom: 20px;
+
+  width: min(460px, calc(100% - 24px));
+  max-height: calc(100dvh - 40px);
+
+  transform: translateX(-50%);
+
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  background: #fff;
+  color: #171717;
+
+  border-radius: 24px;
+
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.18),
+    0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.hostel-card__content {
+  position: relative;
+  padding: 24px;
+}
+
+.hostel-card__content--main {
+  padding-top: 28px;
+}
+
+.hostel-card h2 {
+  margin: 0 45px 8px 0;
+
+  font-size: 24px;
+  line-height: 1.2;
+  font-weight: 750;
+}
+
+.hostel-card__close {
+  position: absolute;
+  z-index: 2;
+
+  top: 14px;
+  right: 14px;
+
+  width: 38px;
+  height: 38px;
+
+  border: 0;
+  border-radius: 50%;
+
+  background: #f1f1f1;
+  color: #555;
+
+  font-size: 26px;
+  line-height: 1;
+
+  cursor: pointer;
+}
+
+.hostel-card__address {
+  margin: 0 0 16px;
+
+  color: #555;
+
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+/* =========================
+   WORKING STATUS
+   ========================= */
+
+.hostel-card__working {
+  position: relative;
+
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+
+  width: 100%;
+  min-height: 64px;
+
+  margin: 0 0 14px;
+  padding: 12px 14px;
+
+  gap: 12px;
+
+  border-radius: 14px;
+
+  overflow: hidden;
+}
+
+.hostel-card__working--open {
+  background: #ecfdf3;
+  color: #166534;
+}
+
+.hostel-card__working--closed {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.hostel-card__working-icon {
+  flex: 0 0 22px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 22px;
+  height: 22px;
+
+  font-size: 18px;
+  line-height: 22px;
+}
+
+.hostel-card__working-text {
+  flex: 1 1 auto;
+
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+
+  min-width: 0;
+
+  margin: 0;
+  padding: 0;
+
+  gap: 3px;
+}
+
+.hostel-card__working-text strong {
+  display: block;
+
+  margin: 0;
+  padding: 0;
+
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 700;
+
+  white-space: normal;
+}
+
+.hostel-card__working-text small {
+  display: block;
+
+  margin: 0;
+  padding: 0;
+
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+
+  white-space: nowrap;
+}
+
+/* =========================
+   DISTANCE
+   ========================= */
+
+.hostel-card__distance {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+
+  width: 100%;
+
+  margin: 0 0 14px;
+  padding: 0;
+
+  gap: 5px;
+
+  color: #555;
+
+  font-size: 15px;
+  line-height: 22px;
+}
+
+.hostel-card__distance strong {
+  font-weight: 700;
+  color: #333;
+}
+
+/* =========================
+   BEDS
+   ========================= */
+
+.hostel-card__info {
+  display: block;
+
+  width: 100%;
+
+  margin: 0;
+  padding: 14px 16px;
+
+  border-radius: 14px;
+
+  background: #f6f6f6;
+
+  font-size: 15px;
+  line-height: 22px;
+}
+
+/* =========================
+   METRO
+   ========================= */
+
+.hostel-card__metro {
+  margin-top: 18px;
+  padding: 16px;
+
+  border-radius: 18px;
+
+  background: #f7f8fa;
+}
+
+.hostel-card__metro-title {
+  margin-bottom: 14px;
+
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 700;
+}
+
+.hostel-card__metro-route {
+  display: flex;
+  flex-direction: column;
+
+  gap: 10px;
+}
+
+.hostel-card__metro-point {
+  display: flex;
+  align-items: flex-start;
+
+  gap: 10px;
+}
+
+.hostel-card__metro-point > span {
+  flex: 0 0 auto;
+
+  font-size: 20px;
+  line-height: 24px;
+}
+
+.hostel-card__metro-point > div {
+  display: flex;
+  flex-direction: column;
+
+  gap: 2px;
+
+  min-width: 0;
+}
+
+.hostel-card__metro-point small {
+  color: #777;
+
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.hostel-card__metro-point strong {
+  font-size: 15px;
+  line-height: 20px;
+}
+
+.hostel-card__metro-point div > span {
+  color: #666;
+
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.hostel-card__metro-arrow {
+  margin-left: 6px;
+
+  color: #888;
+
+  font-size: 18px;
+  line-height: 20px;
+}
+
+.hostel-card__metro-walk {
+  margin-top: 10px;
+
+  color: #666;
+
+  font-size: 13px;
+  line-height: 19px;
+}
+
+.hostel-card__route-button {
+  width: 100%;
+
+  margin-top: 14px;
+  padding: 11px 14px;
+
+  border: 0;
+  border-radius: 12px;
+
+  background: #2563eb;
+  color: #fff;
+
+  font-size: 14px;
+  font-weight: 650;
+
+  cursor: pointer;
+}
+
+.hostel-card__route {
+  margin-top: 12px;
+  padding: 14px;
+
+  border-radius: 14px;
+
+  background: #fff;
+
+  border: 1px solid #e8e8e8;
+}
+
+.hostel-card__route-title {
+  margin-bottom: 10px;
+
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 700;
+}
+
+.hostel-card__route-station {
+  display: flex;
+  align-items: flex-start;
+
+  gap: 10px;
+
+  padding: 7px 0;
+}
+
+.hostel-card__route-station > span {
+  width: 24px;
+  flex: 0 0 24px;
+}
+
+.hostel-card__route-station > div {
+  display: flex;
+  flex-direction: column;
+
+  gap: 2px;
+}
+
+.hostel-card__route-station strong {
+  font-size: 14px;
+  line-height: 19px;
+}
+
+.hostel-card__route-station small {
+  color: #777;
+
+  font-size: 12px;
+  line-height: 17px;
+}
+
+/* =========================
+   DESCRIPTION
+   ========================= */
+
+.hostel-card__description {
+  margin: 18px 0;
+
+  color: #555;
+
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* =========================
+   BUTTONS
+   ========================= */
+
+.hostel-card__buttons {
+  display: grid;
+
+  grid-template-columns: 1fr 1fr;
+
+  gap: 10px;
+}
+
+.hostel-card__book,
+.hostel-card__contacts,
+.hostel-card__back {
+  min-height: 48px;
+
+  border-radius: 14px;
+
+  font-size: 15px;
+  font-weight: 700;
+
+  cursor: pointer;
+}
+
+.hostel-card__book {
+  border: 0;
+
+  background: #2563eb;
+  color: #fff;
+}
+
+.hostel-card__book:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.hostel-card__book--success {
+  background: #16a34a;
+}
+
+.hostel-card__contacts {
+  border: 1px solid #ddd;
+
+  background: #fff;
+  color: #222;
+}
+
+/* =========================
+   CONTACTS
+   ========================= */
+
+.hostel-card__content--contacts {
+  padding-top: 38px;
+}
+
+.hostel-card__contacts-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 56px;
+  height: 56px;
+
+  margin-bottom: 16px;
+
+  border-radius: 18px;
+
+  background: #f1f1f1;
+
+  font-size: 26px;
+}
+
+.hostel-card__contact-item {
+  display: flex;
+  align-items: center;
+
+  gap: 12px;
+
+  margin-top: 10px;
+  padding: 14px;
+
+  border-radius: 14px;
+
+  background: #f6f6f6;
+
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.hostel-card__back {
+  width: 100%;
+
+  margin-top: 18px;
+
+  border: 0;
+
+  background: #eee;
+  color: #222;
+}
+
+/* =========================
+   MAP STATUS
+   ========================= */
+
+.map-status,
+.map-error {
+  position: fixed;
+  z-index: 900;
+
+  top: 16px;
+  left: 50%;
+
+  transform: translateX(-50%);
+
+  max-width: calc(100% - 32px);
+
+  padding: 10px 16px;
+
+  border-radius: 12px;
+
+  background: rgba(255, 255, 255, 0.95);
+
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.12);
+
+  font-size: 14px;
+  line-height: 20px;
+
+  text-align: center;
+}
+
+.map-error {
+  color: #b91c1c;
+}
+
+/* =========================
+   MOBILE
+   ========================= */
+
+@media (max-width: 600px) {
+  .hostel-card {
+    left: 50%;
+    bottom: 10px;
+
+    width: calc(100% - 16px);
+
+    max-height: calc(100dvh - 20px);
+
+    border-radius: 22px;
+  }
+
+  .hostel-card__content {
+    padding: 20px;
+  }
+
+  .hostel-card__content--main {
+    padding-top: 24px;
+  }
+
+  .hostel-card h2 {
+    font-size: 21px;
+    line-height: 1.25;
+  }
+
+  .hostel-card__working {
+    min-height: 64px;
+
+    margin-bottom: 14px;
+    padding: 12px;
+  }
+
+  .hostel-card__working-text strong {
+    font-size: 14px;
+    line-height: 19px;
+  }
+
+  .hostel-card__working-text small {
+    font-size: 12px;
+    line-height: 17px;
+  }
+
+  .hostel-card__distance {
+    margin-bottom: 14px;
+
+    font-size: 14px;
+    line-height: 21px;
+  }
+
+  .hostel-card__buttons {
+    grid-template-columns: 1fr;
+  }
+
+  .hostel-card__book,
+  .hostel-card__contacts {
+    min-height: 50px;
+  }
+}
