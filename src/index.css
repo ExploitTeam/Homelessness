@@ -190,21 +190,52 @@ body {
 
 @media (max-width: 600px) {
   .hostel-card {
-  top: auto;
-  left: 10px;
-  right: 10px;
-  bottom: 10px;
+    position: fixed;
 
-  width: auto;
-  max-height: 55vh;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
 
-  padding: 16px;
+    width: auto;
+    height: calc(100dvh - 20px);
+    max-height: none;
 
-  border-radius: 18px;
+    padding: 16px;
 
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
+    background: white;
+    border-radius: 18px;
+
+    z-index: 9999;
+
+    overflow-x: hidden;
+    overflow-y: scroll;
+
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+
+    touch-action: pan-y;
+
+    pointer-events: auto;
+  }
+
+  .hostel-card__content {
+    width: 100%;
+    min-height: min-content;
+  }
+
+  .hostel-card__content--main {
+    padding-bottom: 20px;
+  }
+
+  .hostel-card__route {
+    margin-top: 14px;
+    padding-bottom: 10px;
+  }
+
+  .hostel-card__buttons {
+    padding-bottom: 20px;
+  }
 
   .hostel-card h2 {
     font-size: 20px;
@@ -215,18 +246,26 @@ body {
     font-size: 14px;
   }
 
+  .hostel-card__distance {
+    font-size: 14px;
+  }
+
   .hostel-card__description {
     font-size: 14px;
     margin-bottom: 14px;
   }
 
   .hostel-card__buttons {
-  gap: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
   }
 
   .hostel-card__book,
   .hostel-card__contacts {
-    min-height: 48px;
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 14px;
     font-size: 16px;
   }
 
@@ -255,14 +294,6 @@ body {
     width: auto;
     max-width: none;
   }
-
-.hostel-card__book,
-.hostel-card__contacts {
-  width: 100%;
-  min-height: 44px;
-  padding: 10px 14px;
-  font-size: 16px;
-}
 }
 /* Анимация карточки */
 
@@ -424,4 +455,460 @@ body {
 .hostel-card__metro-walk {
   font-size: 14px;
   color: #666;
+}
+.hostel-card__metro {
+  margin-bottom: 20px;
+  padding: 14px;
+  border-radius: 14px;
+  background: #f5f7fb;
+}
+
+.hostel-card__metro-title {
+  margin-bottom: 14px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.hostel-card__metro-point {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.hostel-card__metro-point > span {
+  font-size: 20px;
+}
+
+.hostel-card__metro-point div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.hostel-card__metro-point small {
+  color: #777;
+  font-size: 12px;
+}
+
+.hostel-card__metro-point strong {
+  font-size: 16px;
+}
+
+.hostel-card__metro-point div > span {
+  color: #555;
+  font-size: 13px;
+}
+
+.hostel-card__metro-arrow {
+  margin: 5px 0 5px 7px;
+  color: #777;
+  font-size: 20px;
+}
+
+.hostel-card__metro-walk {
+  margin-top: 10px;
+  color: #666;
+  font-size: 13px;
+}
+.hostel-card__route-button {
+  width: 100%;
+  margin-top: 12px;
+  padding: 11px 14px;
+  border: none;
+  border-radius: 10px;
+  background: #2563eb;
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.hostel-card__route-button:hover {
+  background: #1d4ed8;
+}
+
+.hostel-card__route {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #ddd;
+}
+
+.hostel-card__route-title {
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+
+.hostel-card__route-station {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.hostel-card__route-station > span {
+  width: 24px;
+  text-align: center;
+}
+
+.hostel-card__route-station div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.hostel-card__route-station strong {
+  font-size: 14px;
+}
+
+.hostel-card__route-station small {
+  color: #777;
+  font-size: 12px;
+}
+.map {
+  width: 100%;
+  height: 100dvh;
+}
+
+.metro-route-marker {
+  width: 32px;
+  height: 32px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: white;
+  border: 2px solid #2563eb;
+  border-radius: 50%;
+
+  font-size: 16px;
+
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.25);
+
+  pointer-events: none;
+}
+
+.hostel-marker {
+  cursor: pointer;
+}
+
+@media (max-width: 600px) {
+  .hostel-card {
+    position: fixed;
+
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+
+    width: auto;
+
+    height: calc(100dvh - 20px);
+
+    max-height: none;
+
+    padding: 16px;
+
+    background: white;
+
+    border-radius: 18px;
+
+    z-index: 9999;
+
+    overflow-x: hidden;
+    overflow-y: auto;
+
+    -webkit-overflow-scrolling: touch;
+
+    overscroll-behavior: contain;
+
+    touch-action: pan-y;
+
+    pointer-events: auto;
+  }
+
+  .hostel-card__content {
+    min-height: min-content;
+  }
+
+  .hostel-card__content--main {
+    padding-bottom: 30px;
+  }
+
+  .hostel-card__buttons {
+    padding-bottom: 20px;
+  }
+}
+
+.metro-line-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 5px;
+}
+
+.metro-line-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+
+  padding: 3px 7px;
+
+  border: 1px solid;
+  border-radius: 999px;
+
+  background: white;
+
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.metro-line-dot {
+  width: 8px;
+  height: 8px;
+
+  border-radius: 50%;
+
+  flex-shrink: 0;
+}
+
+.hostel-card__route-station--transfer {
+  padding: 10px;
+
+  border-radius: 10px;
+
+  background: white;
+
+  box-shadow:
+    0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.route-station-icon {
+  width: 28px;
+
+  flex-shrink: 0;
+
+  text-align: center;
+}
+
+.route-station-content {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.transfer-label {
+  width: fit-content;
+
+  padding: 2px 5px;
+
+  border-radius: 4px;
+
+  background: #eee;
+
+  color: #555;
+
+  font-size: 9px;
+  font-weight: 700;
+}
+
+/* =========================================
+   КНОПКА МЕТРО
+   ========================================= */
+
+.metro-toggle {
+  position: absolute;
+  top: 70px;
+  left: 14px;
+
+  width: 44px;
+  height: 44px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: none;
+  border-radius: 12px;
+
+  background: white;
+
+  font-size: 22px;
+
+  cursor: pointer;
+
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.25);
+
+  z-index: 20;
+
+  transition:
+    transform 0.15s ease,
+    background 0.15s ease;
+}
+
+.metro-toggle:hover {
+  transform: scale(1.05);
+}
+
+.metro-toggle:active {
+  transform: scale(0.95);
+}
+
+/* =========================================
+   СТАНЦИЯ МЕТРО
+   ========================================= */
+
+.metro-station-marker {
+  width: 12px;
+  height: 12px;
+
+  border: 2px solid white;
+
+  border-radius: 50%;
+
+  box-shadow:
+    0 1px 4px
+      rgba(0, 0, 0, 0.45);
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  cursor: pointer;
+}
+
+/* =========================================
+   МАРКЕР МАРШРУТА
+   ========================================= */
+
+.metro-route-marker {
+  width: 30px;
+  height: 30px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: white;
+
+  border: 2px solid #2563eb;
+
+  border-radius: 50%;
+
+  font-size: 16px;
+
+  box-shadow:
+    0 2px 8px
+      rgba(0, 0, 0, 0.3);
+}
+
+/* =========================================
+   МОБИЛЬНЫЙ ЭКРАН
+   ========================================= */
+
+@media (max-width: 600px) {
+  .metro-toggle {
+    top: 60px;
+    left: 10px;
+
+    width: 42px;
+    height: 42px;
+
+    border-radius: 11px;
+
+    font-size: 20px;
+  }
+
+  .metro-station-marker {
+    width: 11px;
+    height: 11px;
+  }
+}
+.metro-toggle {
+  position: absolute;
+  top: 70px;
+  left: 14px;
+
+  width: 44px;
+  height: 44px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: none;
+  border-radius: 12px;
+
+  background: white;
+
+  font-size: 22px;
+  cursor: pointer;
+
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.25);
+
+  z-index: 20;
+}
+
+.metro-toggle:hover {
+  transform: scale(1.05);
+}
+
+.metro-toggle:active {
+  transform: scale(0.95);
+}
+
+.metro-station-marker {
+  width: 12px;
+  height: 12px;
+
+  border: 2px solid white;
+  border-radius: 50%;
+
+  box-shadow:
+    0 1px 4px rgba(0, 0, 0, 0.45);
+
+  cursor: pointer;
+}
+
+.metro-route-marker {
+  width: 30px;
+  height: 30px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: white;
+
+  border: 2px solid #2563eb;
+  border-radius: 50%;
+
+  font-size: 16px;
+
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+@media (max-width: 600px) {
+  .metro-toggle {
+    top: 60px;
+    left: 10px;
+
+    width: 42px;
+    height: 42px;
+
+    font-size: 20px;
+  }
+
+  .metro-station-marker {
+    width: 11px;
+    height: 11px;
+  }
 }
