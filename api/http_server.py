@@ -92,7 +92,12 @@ async def info(user_id: int = Depends(get_current_user_id)):
     Защищенный эндпоинт. Доступен только с валидным JWT-токеном.
     Заголовки запроса от фронта: Authorization: Bearer <token>
     """
+
     all_homestays = get_all_homestays()
+    print("REQUEST ANSWER: \n", {
+        "user_id": user_id,
+        "places" : all_homestays
+    })
     return {
         "user_id": user_id,
         "places": all_homestays
