@@ -1,4 +1,26 @@
 import parser.coordinate_finder_v2 as coordinates_finder_v2
+from enum import Enum
+
+class HomestayTypes(Enum):
+    SLEEP = 1
+    HOMESTAY = 2
+    SHOWER = 3
+    NIGHT_BUS = 4
+    PICKUP = 5
+    CONSULTATION = 6
+
+    @property
+    def label(self) -> str:
+        translations = {
+            HomestayTypes.SLEEP: "Пункт обогрева",
+            HomestayTypes.HOMESTAY: "Ночной приют",
+            HomestayTypes.SHOWER: "Бесплатный душ",
+            HomestayTypes.NIGHT_BUS: "Ночной автобус с едой, медикаментами и соц. помощью",
+            HomestayTypes.PICKUP: "Пункт выдачи одежды и средств гигиены",
+            HomestayTypes.CONSULTATION: "Консультационная служба по юридическим и социальным вопросоам, выдача еды, одежды и средств гигены"
+        }
+        return translations[self]
+
 
 class User:
     def __init__(self, id : int = 0, username : str | None = None,
@@ -65,7 +87,7 @@ class Homestay:
         if usr:
             name = usr.username
         return (f"📍 Адрес: {self.address}\n"
-                f"🔵 Тип: {self.homestay_type if self.homestay_type else '-'}\n"
+                f"🔵 Тип: {HomestayTypes.homestay_type.label() if self.homestay_type else '-'}\n"
                 f"😎 Менеджер: {name if name else 'n/a'}\n"
                 f"👤 Всего мест: {self.all_beds}\n"
                 f"👤 Свободно: {self.available_beds}\n"
