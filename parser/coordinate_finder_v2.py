@@ -32,10 +32,10 @@ def normalize_address(address: str) -> str:
     return addr.strip().capitalize()
 
 
-def get_coordinates(address: str) -> tuple[float, float]:
+def get_coordinates(address: str) -> tuple[float, float, bool]:
     clean_address = " ".join(address.split()).strip()
     if not clean_address:
-        return (0.0, 0.0)
+        return 0.0, 0.0, False
 
     ready_address = normalize_address(clean_address)
     print(f"🔍 Отправляем в геокодер нормализованный адрес: '{ready_address}'")
@@ -46,12 +46,12 @@ def get_coordinates(address: str) -> tuple[float, float]:
 
         if location:
             print(f"✅ Успешно найдено! Координаты: {location.latitude}, {location.longitude}")
-            return location.latitude, location.longitude
+            return location.latitude, location.longitude, False
 
     except Exception as e:
         print(f"⚠️ Ошибка сети геокодера: {e}")
 
     print(f"❌ Не удалось найти на карте даже после нормализации. Ставим дефолтный центр города.")
     if "санкт-петербург" in ready_address.lower() or "спб" in ready_address.lower():
-        return (59.9343, 30.3351)  # Центр СПб
-    return (55.7558, 37.6173)  # Центр Москвы
+        return 59.9343, 30.3351, False  # Центр СПб
+    return 55.7558, 37.6173, False  # Центр Москвы

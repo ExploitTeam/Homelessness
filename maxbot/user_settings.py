@@ -9,8 +9,8 @@ msg.get("callback", {}).get("payload", "") == "edit_user")
 async def edit_user_button_pressed(update, bot):
     user = update.get('callback', {}).get('user', {})
     id = user.get('user_id', {})
-    bot.set_next_step(id, "set_user_for_edit")
     msg_id = update.get('message', {}).get('body', {}).get('mid', "")
+    bot.set_next_step(id, "set_user_for_edit")
     await bot.edit_msg(msg_id, f"Введите ID пользователя для редактирования. ID видно в этом боте в главном меню.", keyboard_to_start.keyboard)
 
 
