@@ -1,77 +1,9 @@
-import type { UserLocation } from "../types";
-
 const API_URL = "https://homelessness.bot.nu";
-
-interface BackendPlace {
-  id: number;
-  address: string;
-  all_beds: number;
-  available_beds: number;
-  open_time: string;
-  close_time: string;
-  is_working: number;
-  additional_info: string | null;
-  homestay_type?: number | null;
-}
-
-interface PlacesResponse {
-  user_id: number;
-  places: BackendPlace[];
-}
-
-interface AuthResponse {
-  access_token: string;
-  token_type: string;
-}
-
-interface BookResponse {
-  status?: string;
-  message?: string;
-  detail?: string;
-}
 
 let accessToken: string | null = null;
 
 function getMaxInitData(): string {
   return window.WebApp?.initData ?? "";
-}
-
-function getDemoHostels(): HostelApiItem[] {
-  return [
-    {
-      id: 1,
-      address: "Ленина 5",
-      all_beds: 20,
-      available_beds: 20,
-      open_time: "16:30",
-      close_time: "06:10",
-      is_working: true,
-      additional_info: "Новый пункт обогрева. Всю зиму.",
-      homestay_type: null,
-    },
-    {
-      id: 2,
-      address: "Москва, demo-пункт №2",
-      all_beds: 15,
-      available_beds: 8,
-      open_time: "20:00",
-      close_time: "08:00",
-      is_working: true,
-      additional_info: "Пункт обогрева. С октября по апрель.",
-      homestay_type: null,
-    },
-    {
-      id: 3,
-      address: "Пр. Девятого Января, 8",
-      all_beds: 10,
-      available_beds: 4,
-      open_time: "20:00",
-      close_time: "08:00",
-      is_working: true,
-      additional_info: "Ночной приют. Круглый год.",
-      homestay_type: null,
-    },
-  ];
 }
 
 async function authorize(): Promise<string> {
@@ -83,7 +15,7 @@ async function authorize(): Promise<string> {
 
   if (!initData) {
     throw new Error(
-      "MAX initData отсутствует. Открой приложение внутри MAX."
+      "Приложение запущено не внутри MAX: отсутствует initData"
     );
   }
 
@@ -98,39 +30,40 @@ async function authorize(): Promise<string> {
   });
 
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Ошибка авторизации: ${text}`);
+    throw new Error(
+      `Ошибка авторизации: ${response.status}`
+    );
   }
 
-  const data: AuthResponse = await response.json();
+  const data: {
+    access_token: string;
+  } = await response.json();
 
   accessToken = data.access_token;
 
   return accessToken;
 }
 
-export interface HostelApiItem {
+export interface BackendPlace {
   id: number;
   address: string;
-  all_beds: number;
   available_beds: number;
+  all_beds: number;
   open_time: string;
   close_time: string;
-  is_working: boolean;
-  additional_info: string;
-  homestay_type: number | null;
+  is_working: number;
+  additional_info: string | null;
+  homestay_type: number;
+  longtitude: number | null;
+  latitude: number | null;
 }
 
-export async function getHostels(
-  _userLocation?: UserLocation
-): Promise<HostelApiItem[]> {
-  const initData = getMaxInitData();
+interface PlacesResponse {
+  user_id: number;
+  places: BackendPlace[];
+}
 
-  if (!initData) {
-    console.log("MAX initData отсутствует — используем демо-данные.");
-    return getDemoHostels();
-  }
-
+export async function getHostels(): Promise<BackendPlace[]> {
   const token = await authorize();
 
   const response = await fetch(`${API_URL}/api/places`, {
@@ -141,87 +74,55 @@ export async function getHostels(
   });
 
   if (!response.ok) {
-    if (response.status === 401) {
-      accessToken = null;
-    }
-
-    const text = await response.text();
-    throw new Error(`Не удалось загрузить ночлежки: ${text}`);
+    throw new Error(
+      `Ошибка загрузки ночлежек: ${response.status}`
+    );
   }
 
   const data: PlacesResponse = await response.json();
 
-  return data.places.map((place) => ({
-    id: place.id,
-    address: place.address,
-    all_beds: place.all_beds,
-    available_beds: place.available_beds,
-    open_time: place.open_time,
-    close_time: place.close_time,
-    is_working: Boolean(place.is_working),
-    additional_info: place.additional_info ?? "",
-    homestay_type: place.homestay_type ?? null,
-  }));
+  return data.places;
 }
 
-export async function bookHostel(params: {
+export interface BookHostelParams {
   hostelId: number;
-  userLocation?: UserLocation;
-}): Promise<{
+}
+
+export interface BookHostelResponse {
   success: boolean;
   message?: string;
-}> {
-  const initData = getMaxInitData();
+}
 
-  // Локальный режим: имитируем успешную бронь.
-  if (!initData) {
-    console.log(
-      `Демо-бронирование ночлежки №${params.hostelId}`
+export async function bookHostel(
+  params: BookHostelParams
+): Promise<BookHostelResponse> {
+  const token = await authorize();
+
+  const response = await fetch(`${API_URL}/api/book`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      id_homestay: params.hostelId,
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+
+    throw new Error(
+      `Ошибка бронирования: ${response.status} ${text}`
     );
-
-    return {
-      success: true,
-      message: "Место успешно забронировано (демо-режим)",
-    };
   }
 
-  try {
-    const token = await authorize();
+  const data: {
+    message?: string;
+  } = await response.json();
 
-    const response = await fetch(`${API_URL}/api/book`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        id_homestay: params.hostelId,
-      }),
-    });
-
-    const data: BookResponse = await response.json();
-
-    if (!response.ok) {
-      return {
-        success: false,
-        message:
-          data.detail ?? "Не удалось забронировать место",
-      };
-    }
-
-    return {
-      success: data.status === "success",
-      message: data.message,
-    };
-  } catch (error) {
-    console.error("Ошибка бронирования:", error);
-
-    return {
-      success: false,
-      message:
-        error instanceof Error
-          ? error.message
-          : "Не удалось забронировать место",
-    };
-  }
+  return {
+    success: true,
+    message: data.message,
+  };
 }
