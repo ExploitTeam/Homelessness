@@ -29,6 +29,18 @@ def initialize_database():
                 latitude REAL
             )
         """)
+        try:
+            cursor.execute("""
+                ALTER TABLE homestays ADD COLUMN longtitude REAL;
+            """)
+        except Exception as e:
+            print("Error adding column longtitude", e)
+        try:
+            cursor.execute("""
+                ALTER TABLE homestays ADD COLUMN latitude REAL;
+            """)
+        except Exception as e:
+            print("Error adding column latitude", e)
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (

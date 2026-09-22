@@ -3,7 +3,9 @@ import sqlite3
 from maxbot.bot_manager import bot, keyboard_to_start
 from database.db_manager import *
 from maxbot.functions import *
+from maxbot.maxapi import Bot
 from parser.parser import proceed_parsing
+import parser.coordinate_finder_v2 as coordinates_finder_v2
 from database import db_manager, classes
 
 # =====================================================================
@@ -12,9 +14,14 @@ from database import db_manager, classes
 
 async def do_remove_homestay(user_id: int, homestay_id: int, bot, update):
     """Удаление пункта размещения"""
-    db_manager.delete_homestay(id=homestay_id)
-    await bot.send_msg(user_id, f"❌ Пункт с ID {homestay_id} успешно удален из базы данных.")
-    await edit_user_button_pressed(update, bot)
+    homestay = db_manager.get_homestay(id=homestay_id)
+    res = db_manager.delete_homestay(homestay)
+    if res:
+        await bot.send_msg(user_id, f"❌ Пункт с адресом «{homestay.address}» успешно удален из базы данных.",
+                           keyboard_to_start.keyboard)
+    else:
+        await bot.send_msg(user_id, f"❌ Ошибка удаления пункта {homestay.address}",
+                           keyboard_to_start.keyboard)
 
 
 async def do_change_address(user_id: int, homestay_id: int, bot, update):
@@ -57,6 +64,15 @@ async def do_close_homestay(user_id: int, homestay_id: int, bot, update):
         db_manager.insert_or_update_homestay(homestay)
         update['callback']['payload'] = json.dumps({"homestay_id": homestay_id})
         await edit_one_homestay(update, bot)
+
+
+async def update_location(user_id: int, homestay_id: int, bot, update):
+    """Перевод пункта в статус закрытого/открытого"""
+    homestay = db_manager.get_homestay(id=homestay_id)
+    if homestay:
+        homestay.longtitude, homestay.latitude = coordinates_finder_v2.get_coordinates(homestay.address)
+        db_manager.insert_or_update_homestay(homestay)
+        await bot.send_msg(user_id, f"Данные обновлены.")
 
 
 async def do_change_work_hours(user_id: int, homestay_id: int, bot, update):
@@ -118,7 +134,8 @@ HOMESTAY_ACTIONS = {
     "close_homestay": do_close_homestay,
     "change_work_hours": do_change_work_hours,
     "change_description_homestay": do_change_description,
-    "change_type_homestay": do_change_type
+    "change_type_homestay": do_change_type,
+    "update_location": update_location
 }
 
 
@@ -324,6 +341,9 @@ async def edit_one_homestay(update, bot, send_new = False):
     ))
     keyboard.add_button("Изменить тип пункта", button_types.callback, payload=json.dumps(
         {"command": "change_type_homestay", "homestay_id": homestay_id}
+    ))
+    keyboard.add_button("Обновить координаты", button_types.callback, payload=json.dumps(
+        {"command": "update_location", "homestay_id": homestay_id}
     ))
     if not send_new:
         await bot.edit_msg(msg_id, f"Информация о пункте:\n{homestay}\n\nМенеджер:\n{usr_info_homestay}", keyboard.keyboard)

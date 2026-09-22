@@ -12,7 +12,8 @@ ADMINS = [int(i) for i in os.getenv("MAX_ADMINS_ID", "").split(",")]
 
 start_text = ("Привет{} 👋\n"
               "Это бот, который поможет вам найти место, где можно согреться или переночевать.\n"
-              "Нажмите кнопку 'Отправить геопозицию', чтобы посмотреть ближайшие к вам ночлежки.\n\n"
+              "Нажмите кнопку «Отправить геопозицию»', чтобы посмотреть ближайшие к вам ночлежки.\n"
+              "Вы можете открыть мини-пиложение и ознакомиться с пунктами на карте.\n\n"
               "Ваш ID: {}.")
 
 def show_all(name=None, get_in_dict=False):
@@ -91,7 +92,6 @@ async def do_on_start(bot, usr, msg_id = None):
         text = start_text.format("", id)
 
     keyboard.add_button("Отправить геопозицию", button_types.request_geo_location, payload="send_geo")
-    keyboard.add_button("Открыть мини приложение", button_types.callback, payload="open_mini_app")
     if msg_id:
         await bot.edit_msg(msg_id, text, keyboard.keyboard)
     else:
