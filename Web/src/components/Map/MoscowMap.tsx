@@ -159,9 +159,7 @@ export default function MoscowMap({
 
               coordinates:
                 line.stations.map(
-                  (
-                    station
-                  ) => [
+                  (station) => [
                     station[2],
                     station[1],
                   ]
@@ -203,7 +201,7 @@ export default function MoscowMap({
 
       /*
        * =====================================
-       * СОБИРАЕМ ВСЕ СТАНЦИИ
+       * СОБИРАЕМ СТАНЦИИ
        * =====================================
        */
 
@@ -213,25 +211,14 @@ export default function MoscowMap({
           MetroStationView
         >();
 
-      for (
-        const line of metroLines
-      ) {
-        for (
-          const station of line.stations
-        ) {
-          const name =
-            station[0];
-
-          const lat =
-            station[1];
-
-          const lng =
-            station[2];
+      for (const line of metroLines) {
+        for (const station of line.stations) {
+          const name = station[0];
+          const lat = station[1];
+          const lng = station[2];
 
           const key =
-            `${name}_${lat.toFixed(
-              5
-            )}_${lng.toFixed(5)}`;
+            `${name}_${lat.toFixed(5)}_${lng.toFixed(5)}`;
 
           const existing =
             stationMap.get(key);
@@ -269,9 +256,7 @@ export default function MoscowMap({
        */
 
       stationMap.forEach(
-        (
-          station: MetroStationView
-        ) => {
+        (station) => {
           const element =
             document.createElement(
               "div"
@@ -280,27 +265,27 @@ export default function MoscowMap({
           element.className =
             "metro-station-marker";
 
-          /*
-           * Одна линия
-           */
+          element.style.width = "11px";
+          element.style.height = "11px";
+          element.style.borderRadius = "50%";
+          element.style.border =
+            "2px solid white";
+          element.style.boxShadow =
+            "0 1px 5px rgba(0,0,0,0.35)";
+          element.style.cursor =
+            "pointer";
 
           if (
-            station.colors.length ===
-            1
+            station.colors.length === 1
           ) {
             element.style.background =
               station.colors[0];
           } else {
-            /*
-             * Пересадка.
-             * Делим кружок на сектора.
-             */
-
             const sectors =
               station.colors.map(
                 (
-                  color: string,
-                  index: number
+                  color,
+                  index
                 ) => {
                   const start =
                     (index /
@@ -413,9 +398,7 @@ export default function MoscowMap({
         }
 
         metroMarkers.current.forEach(
-          (
-            marker: Marker
-          ) => {
+          (marker) => {
             marker
               .getElement()
               .style.display =
@@ -469,6 +452,17 @@ export default function MoscowMap({
     userElement.className =
       "user-marker";
 
+    userElement.style.width = "18px";
+    userElement.style.height = "18px";
+    userElement.style.borderRadius =
+      "50%";
+    userElement.style.background =
+      "#2563eb";
+    userElement.style.border =
+      "4px solid white";
+    userElement.style.boxShadow =
+      "0 2px 8px rgba(0,0,0,0.35)";
+
     const userMarker =
       new Marker({
         element: userElement,
@@ -487,9 +481,7 @@ export default function MoscowMap({
      * Ночлежки
      */
 
-    for (
-      const hostel of hostels
-    ) {
+    for (const hostel of hostels) {
       const element =
         document.createElement(
           "div"
@@ -498,8 +490,24 @@ export default function MoscowMap({
       element.className =
         "hostel-marker";
 
-      element.innerText =
-        "🏠";
+      element.innerText = "🏠";
+
+      element.style.width = "38px";
+      element.style.height = "38px";
+      element.style.display = "flex";
+      element.style.alignItems =
+        "center";
+      element.style.justifyContent =
+        "center";
+      element.style.borderRadius =
+        "50%";
+      element.style.background =
+        "white";
+      element.style.boxShadow =
+        "0 2px 9px rgba(0,0,0,0.3)";
+      element.style.fontSize = "22px";
+      element.style.cursor =
+        "pointer";
 
       element.title =
         hostel.name;
@@ -521,9 +529,7 @@ export default function MoscowMap({
             hostel.lng,
             hostel.lat,
           ])
-          .addTo(
-            map.current
-          );
+          .addTo(map.current);
 
       markers.current.push(
         marker
@@ -535,9 +541,7 @@ export default function MoscowMap({
      */
 
     if (route) {
-      for (
-        const station of route.stations
-      ) {
+      for (const station of route.stations) {
         const element =
           document.createElement(
             "div"
@@ -546,8 +550,23 @@ export default function MoscowMap({
         element.className =
           "metro-route-marker";
 
-        element.innerText =
-          "🚇";
+        element.innerText = "🚇";
+
+        element.style.width = "30px";
+        element.style.height = "30px";
+        element.style.display = "flex";
+        element.style.alignItems =
+          "center";
+        element.style.justifyContent =
+          "center";
+        element.style.borderRadius =
+          "50%";
+        element.style.background =
+          "white";
+        element.style.boxShadow =
+          "0 2px 8px rgba(0,0,0,0.3)";
+        element.style.fontSize =
+          "17px";
 
         element.title =
           station.name;
@@ -560,9 +579,7 @@ export default function MoscowMap({
               station.lng,
               station.lat,
             ])
-            .addTo(
-              map.current
-            );
+            .addTo(map.current);
 
         markers.current.push(
           marker
@@ -640,9 +657,7 @@ export default function MoscowMap({
 
                 coordinates:
                   route.stations.map(
-                    (
-                      station
-                    ) => [
+                    (station) => [
                       station.lng,
                       station.lat,
                     ]
@@ -668,6 +683,7 @@ export default function MoscowMap({
             "line-opacity": 0.95,
           },
         });
+
       };
 
     if (
@@ -751,6 +767,35 @@ export default function MoscowMap({
             ? "Скрыть метро"
             : "Показать метро"
         }
+        style={{
+          position: "absolute",
+          top: "16px",
+          left: "16px",
+          zIndex: 10,
+
+          width: "48px",
+          height: "48px",
+
+          border: "none",
+          borderRadius: "14px",
+
+          background:
+            "rgba(255,255,255,0.96)",
+
+          boxShadow:
+            "0 3px 12px rgba(0,0,0,0.2)",
+
+          fontSize: "24px",
+          cursor: "pointer",
+
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+
+          opacity: metroVisible
+            ? 1
+            : 0.55,
+        }}
       >
         🚇
       </button>

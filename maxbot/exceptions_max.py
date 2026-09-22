@@ -1,0 +1,2 @@
+class ConnectionMaxError(Exception):
+    pass
