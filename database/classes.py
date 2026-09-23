@@ -73,7 +73,7 @@ class Homestay:
         self.additional_info = additional_info
         self.homestay_type = homestay_type
 
-        if not longtitude or not latitude:
+        if longtitude is None and latitude is None:
             self.latitude, self.longtitude, _ = coordinates_finder_v2.get_coordinates(address)
         else:
             self.latitude = latitude

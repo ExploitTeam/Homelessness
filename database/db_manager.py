@@ -5,6 +5,9 @@ from database.info import info
 import sqlite3
 from os import getenv
 from dotenv import load_dotenv
+import json
+from urllib.parse import urlencode
+from urllib.request import urlopen
 
 load_dotenv()
 database_name = f"{getenv('DB_NAME', 'default')}.db"
@@ -341,6 +344,7 @@ def get_all_homestays() -> list[Homestay]:
             for row in rows
         ]
 
+
 def delete_user(user: User | None = None) -> bool:
     """Удаляет пользователя из БД."""
 
@@ -383,3 +387,62 @@ def delete_homestay(homestay: Homestay | None = None) -> bool:
 
     except sqlite3.Error:
         return False
+
+
+def calculate_route_distance(
+    lat1,
+    lon1,
+    lat2,
+    lon2,
+    api_key,
+    profile="car"
+):
+    """
+    Возвращает расстояние по маршруту между двумя координатами.
+
+    :param lat1: широта начальной точки
+    :param lon1: долгота начальной точки
+    :param lat2: широта конечной точки
+    :param lon2: долгота конечной точки
+    :param api_key: API-ключ GraphHopper
+    :param profile: тип маршрута (car, bike, foot и т.д.)
+    :return: расстояние в километрах
+    """
+
+    params = [
+        ("point", f"{lat1},{lon1}"),
+        ("point", f"{lat2},{lon2}"),
+        ("profile", profile),
+        ("calc_points", "false"),
+        ("key", api_key),
+    ]
+
+    url = "https://graphhopper.com/api/1/route?" + urlencode(params)
+
+    try:
+        with urlopen(url, timeout=10) as response:
+            data = json.load(response)
+
+    except Exception as e:
+        raise RuntimeError(f"Ошибка при запросе к GraphHopper: {e}")
+
+    try:
+        # GraphHopper возвращает distance в метрах
+        distance_meters = data["paths"][0]["distance"]
+    except (KeyError, IndexError):
+        raise RuntimeError(f"GraphHopper вернул неожиданный ответ: {data}")
+
+    return distance_meters / 1000
+
+
+def sort_homestays_by_distance(user_longitude : float, user_latitude : float) -> list[Homestay]:
+    homestays = get_all_homestays()
+
+    def dist_sort(homestay):
+        calculate_route_distance(user_latitude, user_longitude,
+                                homestay.latitude, homestay.longitude,
+                                getenv("GRAPHHOPPER_API_KEY", None), "foot")
+    
+    homestays.sort(key=lambda h: dist_sort(h))
+
+    return homestays
