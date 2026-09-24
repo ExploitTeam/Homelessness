@@ -181,8 +181,9 @@ def get_homestay(id : int | None = None,
                 close_time=row[5],
                 is_working=row[6],
                 additional_info=row[7],
-                longtitude=row[8],
-                latitude=row[9]
+                homestay_type=row[8],
+                longtitude=row[9],
+                latitude=row[10]
             )
 
 
@@ -321,6 +322,7 @@ def get_all_homestays() -> list[Homestay]:
                 close_time,
                 is_working,
                 additional_info,
+                homestay_type,
                 longtitude,
                 latitude
             FROM homestays
@@ -338,8 +340,9 @@ def get_all_homestays() -> list[Homestay]:
                 close_time=row[5],
                 is_working=row[6],
                 additional_info=row[7],
-                longtitude=row[8],
-                latitude=row[9]
+                homestay_type=row[8],
+                longtitude=row[9],
+                latitude=row[10]
             )
             for row in rows
         ]
@@ -439,8 +442,8 @@ def sort_homestays_by_distance(user_longitude : float, user_latitude : float) ->
     homestays = get_all_homestays()
 
     def dist_sort(homestay):
-        calculate_route_distance(user_latitude, user_longitude,
-                                homestay.latitude, homestay.longitude,
+        return calculate_route_distance(user_latitude, user_longitude,
+                                homestay.latitude, homestay.longtitude,
                                 getenv("GRAPHHOPPER_API_KEY", None), "foot")
     
     homestays.sort(key=lambda h: dist_sort(h))

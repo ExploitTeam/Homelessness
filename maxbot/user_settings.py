@@ -16,7 +16,7 @@ async def edit_user_button_pressed(update, bot):
     current_usr = get_user(id)
 
     # Если пользователь — менеджер и при этом НЕ входит в глобальный список ADMINS
-    if current_usr and getattr(current_usr, 'user_type', 0) == 1 and id not in ADMINS:
+    if current_usr and getattr(current_usr, 'user_type', 0) in [0, 1] and id not in ADMINS:
         usr = current_usr
         res = await bot.send_msg(id, f"Информация о пользователе:\n{usr}")
 
@@ -47,6 +47,10 @@ async def set_user_for_edit(update, bot):
     user = update.get('message', {}).get('sender', {})
     text = update.get('message', {}).get('body', {}).get('text', "")
     id = user.get('user_id', {})
+    usr = get_user(id)
+    if not id in ADMINS and usr.user_type not in [1, 2]:
+        await bot.send_msg(id, f"Нет доступа.", keyboard_to_start.keyboard)
+        return
     try:
         text = int(text)
     except ValueError:
@@ -82,6 +86,10 @@ safe_json_loads(msg.get("callback", {}).get("payload", "")
 async def set_manager(update, bot):
     sender_id = update.get('callback', {}).get('user', {}).get('user_id', 0)
     current_task = update.get("callback", {}).get("payload", "")
+    usr = get_user(sender_id)
+    if not sender_id in ADMINS and usr.user_type not in [1, 2]:
+        await bot.send_msg(sender_id, f"Нет доступа.", keyboard_to_start.keyboard)
+        return
     if not current_task:
         return
     current_task = safe_json_loads(current_task)
@@ -108,6 +116,7 @@ async def set_manager(update, bot):
         insert_or_update_user(usr)
     if current_task["command"] == "restrict_user":
         usr.user_type = 0
+        usr.id_homestay = -1
         insert_or_update_user(usr)
 
     keyboard = generate_buttons_by_user_privilege(usr, msg_id, sender_id)
@@ -122,6 +131,11 @@ async def attach_to_point(update, bot):
     sender_id = update.get('callback', {}).get('user', {}).get('user_id', 0)
     current_task = update.get("callback", {}).get("payload", "")
     msg_id = update.get('message', {}).get('body', {}).get('mid', "")
+
+    usr = get_user(sender_id)
+    if not sender_id in ADMINS and usr.user_type not in [1, 2]:
+        await bot.send_msg(sender_id, f"Нет доступа.", keyboard_to_start.keyboard)
+        return
     if not current_task:
         return
     current_task = safe_json_loads(current_task)
@@ -142,6 +156,10 @@ safe_json_loads(
 ).get("command", " ") == "input_point_to_attach")
 async def input_point_to_attach(update, bot):
     sender_id = update.get('message', {}).get('sender', {}).get('user_id', 0)
+    usr = get_user(sender_id)
+    if not sender_id in ADMINS and usr.user_type not in [1, 2]:
+        await bot.send_msg(sender_id, f"Нет доступа.", keyboard_to_start.keyboard)
+        return
     target_user = safe_json_loads(
         bot.get_next_step(
             update.get("message", {}).get("sender", {}).get("user_id", 0)

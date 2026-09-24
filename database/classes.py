@@ -1,6 +1,7 @@
 import parser.coordinate_finder_v2 as coordinates_finder_v2
 from enum import Enum
 
+
 class HomestayTypes(Enum):
     SLEEP = 1
     HOMESTAY = 2
@@ -52,7 +53,8 @@ class User:
                 f"👤 Username: {self.username}\n"
                 f"⚡️ Тип учетной записи: {self.__get_type()}\n"
                 f"📱 Телефон: {self.phone_number if self.phone_number else 'n/a'}\n"
-                f"📍 Привязка к точке: {address if address else 'без привязки'}\n"
+                f"{f'📍 Привязка к точке: {address}\n' if address and self.id_homestay
+                else '📍 Без привязки к точке\n' if self.user_type > 0 else ''}"
                 f"🏠 Последнее бронирование: {'-' if self.last_booking is None else self.last_booking}\n")
 
 
@@ -65,15 +67,15 @@ class Homestay:
                  longtitude : float | None = None, latitude : float | None = None):
         self.id = id
         self.address = address
-        self.all_beds = all_beds
-        self.available_beds = available_beds
+        self.all_beds = all_beds or 0
+        self.available_beds = available_beds or 0
         self.open_time = open_time
         self.close_time = close_time
         self.is_working = is_working
         self.additional_info = additional_info
         self.homestay_type = homestay_type
 
-        if longtitude is None and latitude is None:
+        if not longtitude or not latitude:
             self.latitude, self.longtitude, _ = coordinates_finder_v2.get_coordinates(address)
         else:
             self.latitude = latitude
@@ -82,16 +84,39 @@ class Homestay:
 
     def __str__(self):
         from database.db_manager import get_user
+        from maxbot.functions import is_point_open
         usr = get_user(id_homestay=self.id)
         name = ""
+        phone = ""
+        manager = ""
         if usr:
             name = usr.username
+            phone = usr.phone_number
+            manager = (f"😎 Менеджер: {name if name else '-'}\n"
+                       f"📱 Телефон менеджера: {phone if phone else '-'}\n")
+
         return (f"📍 Адрес: {self.address}\n"
-                f"🔵 Тип: {HomestayTypes.homestay_type.label if self.homestay_type else '-'}\n"
-                f"😎 Менеджер: {name if name else 'n/a'}\n"
+                f"🔵 Тип: {HomestayTypes(self.homestay_type).label if self.homestay_type else '-'}\n"
+                f"{manager}"
                 f"👤 Всего мест: {self.all_beds}\n"
                 f"👤 Свободно: {self.available_beds}\n"
                 f"⏳ Часы работы: {self.open_time} - {self.close_time}\n"
-                f"{'🟢  Работает' if self.is_working else '🔴  Закрыто'}\n"
-                f"❗️ Дополнительная информация: {self.additional_info if self.additional_info else 'отсутствует'}\n") # Дописать!!!!
+                f"{'🟢  Работает' if self.is_working else '🔴  Не работает'}\n"
+                f"{'🟢  СЕЙЧАС ОТКРЫТ\n' if is_point_open(self.open_time, self.close_time) and self.is_working
+                else '🔴  СЕЙЧАС ЗАКРЫТ\n' if self.is_working else ''}"
+                f"❗️ {self.additional_info if self.additional_info else 'Дополнительная информация отсутствует'}")
 
+    def to_json(self):
+        return {
+            "id": self.id,
+            "address": self.address,
+            "all_beds": self.all_beds,
+            "available_beds": self.available_beds,
+            "open_time": self.open_time,
+            "close_time": self.close_time,
+            "is_working": self.is_working ,
+            "additional_info": self.additional_info,
+            "homestay_type": self.homestay_type,
+            "longtitude": self.longtitude,
+            "latitude": self.latitude,
+        }

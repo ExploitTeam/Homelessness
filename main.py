@@ -10,6 +10,7 @@ async def main():
     db_manager.initialize_database()
     try:
         bot.connect()
+        bot.loop = asyncio.get_running_loop()
         server_thread = threading.Thread(target=http_server.start_server, daemon=True)
         server_thread.start()
         await bot.pulling()
