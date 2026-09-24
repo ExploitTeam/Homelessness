@@ -4,13 +4,16 @@ import hmac
 import hashlib
 import urllib.parse
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+from starlette.staticfiles import StaticFiles
 from maxbot.bot_manager import bot
 import uvicorn
 from fastapi import FastAPI, HTTPException, Depends, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 import jwt
-
+from fastapi.responses import FileResponse
 from database.db_manager import *
 from maxbot.functions import is_point_open
 
@@ -214,6 +217,18 @@ async def send_bot_msg(user_id: int, text: str, keyboard=None):
         loop,
     )
     return await asyncio.wrap_future(future)
+
+DIST_DIR = Path(__file__).resolve().parents[1] / "Web" / "dist"
+
+if DIST_DIR.exists():
+    app.mount("/assets", StaticFiles(directory=DIST_DIR / "assets"), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def spa(full_path: str):
+        file_path = DIST_DIR / full_path
+        if full_path and file_path.is_file():
+            return FileResponse(file_path)
+        return FileResponse(DIST_DIR / "index.html")
 
 def start_server():
     """Функция для программного запуска сервера из любой точки проекта"""
