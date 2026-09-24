@@ -67,7 +67,6 @@ def _geo_filter_keyboard(selected_types: list) -> InlineKeyboardMarkup:
                 "type": t.value,
             })
         )
-    keyboard.add_button("Смотреть на карте", button_types.callback, payload="open_mini_app")
     keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
     return keyboard
 

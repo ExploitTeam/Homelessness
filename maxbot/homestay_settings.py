@@ -5,7 +5,7 @@ from database.db_manager import *
 from maxbot.functions import *
 from maxbot.maxapi import Bot
 from parser.parser import proceed_parsing
-import parser.coordinate_finder_v2 as coordinates_finder_v2
+import parser.coordinates_finder as coordinates_finder
 from database import db_manager, classes
 
 USER_TYPE_USER = 0
@@ -220,6 +220,23 @@ async def do_change_type(user_id: int, homestay_id: int, bot, update):
                        keyboard.keyboard)
 
 
+async def update_geo_info(user_id: int, homestay_id: int, bot, update):
+    homestay = db_manager.get_homestay(id=homestay_id)
+    longitute, latitude, res = coordinates_finder.get_coordinates(homestay.address)
+    keyboard = InlineKeyboardMarkup()
+    keyboard.add_button(f"Хорошо", button_types.callback, json.dumps({
+        "command": "edit_one_homestay",
+        "homestay_id": homestay_id
+    }))
+    if not res:
+        await bot.send_msg(user_id, f"Ошибка обновления координат. Возможно, указан неизвестный адрес.",
+                     keyboard.keyboard)
+        return
+
+    await bot.send_msg(user_id, f"Координаты обновлены! Проверьте карту. ",
+                 keyboard.keyboard)
+
+
 HOMESTAY_ACTIONS = {
     "remove_homestay": do_remove_homestay,
     "change_address": do_change_address,
@@ -228,7 +245,8 @@ HOMESTAY_ACTIONS = {
     "change_work_hours": do_change_work_hours,
     "change_description_homestay": do_change_description,
     "change_type_homestay": do_change_type,
-    "add_homestay": do_add_homestay
+    "add_homestay": do_add_homestay,
+    "update_geo_info": update_geo_info
 }
 
 
@@ -256,7 +274,7 @@ async def input_new_address(update, bot):
     homestay = db_manager.get_homestay(id=homestay_id)
     lat, lon = (0.0, 0.0)
     try:
-        lat, lon, _ = coordinates_finder_v2.get_coordinates(text)
+        lat, lon, _ = coordinates_finder.get_coordinates(text)
     except Exception as e:
         print(f"Ошибка при первичном поиске координат: {e}")
     if homestay:
@@ -425,7 +443,7 @@ async def create_input_beds(update, bot):
 
     lat, lon = (0.0, 0.0)
     try:
-        lat, lon, _ = coordinates_finder_v2.get_coordinates(address_text)
+        lat, lon, _ = coordinates_finder.get_coordinates(address_text)
     except Exception as e:
         print(f"Ошибка при первичном поиске координат: {e}")
 
@@ -572,6 +590,9 @@ async def edit_one_homestay(update, bot, send_new = False, homestay_id = -1):
     ))
     keyboard.add_button("Изменить тип пункта", button_types.callback, payload=json.dumps(
         {"command": "change_type_homestay", "homestay_id": homestay_id}
+    ))
+    keyboard.add_button("Обновить координаты (положение на карте)", button_types.callback, payload=json.dumps(
+        {"command": "update_geo_info", "homestay_id": homestay_id}
     ))
     if not send_new:
         await bot.edit_msg(msg_id, f"Информация о пункте:\n{homestay}\n\nМенеджер:\n{usr_info_homestay}", keyboard.keyboard)

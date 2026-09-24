@@ -1,4 +1,4 @@
-import parser.coordinate_finder_v2 as coordinates_finder_v2
+import parser.coordinates_finder as coordinates_finder
 from enum import Enum
 
 
@@ -76,7 +76,7 @@ class Homestay:
         self.homestay_type = homestay_type
 
         if not longtitude or not latitude:
-            self.latitude, self.longtitude, _ = coordinates_finder_v2.get_coordinates(address)
+            self.latitude, self.longtitude, _ = coordinates_finder.get_coordinates(address)
         else:
             self.latitude = latitude
             self.longtitude = longtitude
