@@ -254,7 +254,14 @@ async def input_new_address(update, bot):
         return
 
     homestay = db_manager.get_homestay(id=homestay_id)
+    lat, lon = (0.0, 0.0)
+    try:
+        lat, lon, _ = coordinates_finder_v2.get_coordinates(text)
+    except Exception as e:
+        print(f"Ошибка при первичном поиске координат: {e}")
     if homestay:
+        homestay.latitude = lat
+        homestay.longtitude = lon
         homestay.address = text
         db_manager.insert_or_update_homestay(homestay)
         bot.clear_next_step(sender_id)
