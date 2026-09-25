@@ -120,3 +120,21 @@ class Homestay:
             "longtitude": self.longtitude,
             "latitude": self.latitude,
         }
+
+
+class Booking:
+    def __init__(self, id : int = 0, user_id : int | None = None,
+                 homestay_id : int | None = None, date : str | None = None,
+                 time : str | None = None, is_approved : int = 0):
+        self.id = id
+        self.user_id = user_id
+        self.homestay_id = homestay_id
+        self.date = date
+        self.time = time
+        self.is_approved = is_approved
+
+
+    def __str__(self):
+        from database.db_manager import get_booking
+        homestay = get_booking(self.id)
+        pass

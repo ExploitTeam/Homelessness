@@ -1,6 +1,6 @@
 import warnings
 
-from database.classes import Homestay, User
+from database.classes import Homestay, User, Booking
 from database.info import info
 import sqlite3
 from os import getenv
@@ -56,6 +56,20 @@ def initialize_database():
                 phone_number TEXT,
                 id_homestay INTEGER,
                 last_booking TEXT
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS bookings (
+                id INTEGER PRIMARY KEY,
+                user_id INTEGER,
+                homestay_id INTEGER,
+                date TEXT NOT NULL,
+                time TEXT NOT NULL,
+                is_approved INTEGER DEFAULT 0,
+
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (homestay_id) REFERENCES homestays(id)
             )
         """)    
 
@@ -187,6 +201,44 @@ def get_homestay(id : int | None = None,
             )
 
 
+def get_booking(id: int | None = None) -> Booking | None:
+    with sqlite3.connect(database_name) as conn:
+        conn.execute("PRAGMA foreign_keys = ON")
+        cursor = conn.cursor()
+
+        if id is None:
+            return None
+
+
+        query = """
+            SELECT 
+                id,
+                user_id,
+                homestay_id,
+                date,
+                time,
+                is_approved
+            FROM bookings
+            WHERE id = ?
+        """
+
+        cursor.execute(query, (id,))
+
+        row = cursor.fetchone()
+
+        if row is None:
+            return None
+
+        return Booking(
+            id = row[0],
+            user_id = row[1],
+            homestay_id = row[2],
+            date = row[3],
+            time = row[4],
+            is_approved = row[5],
+        )
+
+
 def insert_or_update_user(user : User | None = None) -> bool:
     """Добавление или изменения пользователя в БД."""
 
@@ -305,6 +357,44 @@ def insert_or_update_homestay(homestay : Homestay | None = None) -> bool:
         return False
 
 
+def insert_or_update_booking(booking : Booking | None = None) -> bool:
+    if booking is None:
+        return False
+
+    try:
+        with sqlite3.connect(database_name) as conn:
+            conn.execute("PRAGMA foreign_keys = ON")
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                INSERT INTO bookings (
+                    id,
+                    user_id,
+                    homestay_id,
+                    date,
+                    time,
+                    is_approved
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET 
+                    user_id = excluded.user_id, 
+                    homestay_id = excluded.homestay_id,
+                    date = excluded.date,
+                    time = excluded.time,
+                    is_approved = excluded.is_approved
+            """, (
+                booking.id,
+                booking.user_id,
+                booking.homestay_id,
+                booking.date,
+                booking.time,
+                booking.is_approved,
+            ))
+        return True
+
+    except sqlite3.Error:
+        return False
+
+
 def get_all_homestays() -> list[Homestay]:
     """Возвращает список всех ночлегов из БД."""
 
@@ -348,6 +438,76 @@ def get_all_homestays() -> list[Homestay]:
         ]
 
 
+def get_user_bookings(user : User | None = None) -> list[Booking]:
+    if user is None:
+        return []
+
+    with sqlite3.connect(database_name) as conn:
+            conn.execute("PRAGMA foreign_keys = ON")
+            cursor = conn.cursor()
+    
+            cursor.execute("""
+                SELECT
+                    id,
+                    user_id,
+                    homestay_id,
+                    date,
+                    time,
+                    is_approved
+                FROM bookings
+                WHERE user_id = ?
+            """, (user.id,))
+    
+            rows = cursor.fetchall()
+    
+            return [
+                Booking(
+                    id = row[0],
+                    user_id = row[1],
+                    homestay_id = row[2],
+                    date = row[3],
+                    time = row[4],
+                    is_approved = row[5],
+                )
+                for row in rows
+            ]
+
+
+def get_homestay_bookings(homestay : Homestay | None = None) -> list[Booking]:
+    if homestay is None:
+        return []
+
+    with sqlite3.connect(database_name) as conn:
+            conn.execute("PRAGMA foreign_keys = ON")
+            cursor = conn.cursor()
+    
+            cursor.execute("""
+                SELECT
+                    id,
+                    user_id,
+                    homestay_id,
+                    date,
+                    time,
+                    is_approved
+                FROM bookings
+                WHERE homestay_id = ?
+            """, (homestay.id,))
+    
+            rows = cursor.fetchall()
+    
+            return [
+                Booking(
+                    id = row[0],
+                    user_id = row[1],
+                    homestay_id = row[2],
+                    date = row[3],
+                    time = row[4],
+                    is_approved = row[5],
+                )
+                for row in rows
+            ]
+
+
 def delete_user(user: User | None = None) -> bool:
     """Удаляет пользователя из БД."""
 
@@ -385,6 +545,28 @@ def delete_homestay(homestay: Homestay | None = None) -> bool:
                 DELETE FROM homestays
                 WHERE id = ?
             """, (homestay.id,))
+
+            return cursor.rowcount > 0
+
+    except sqlite3.Error:
+        return False
+
+
+def delete_booking(booking: Booking | None = None) -> bool:
+    """Удаляет пользователя из БД."""
+
+    if booking is None:
+        return False
+
+    try:
+        with sqlite3.connect(database_name) as conn:
+            conn.execute("PRAGMA foreign_keys = ON")
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                DELETE FROM booking
+                WHERE id = ?
+            """, (booking.id,))
 
             return cursor.rowcount > 0
 
