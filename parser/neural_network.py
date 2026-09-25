@@ -57,3 +57,27 @@ def get_coordinates_via_ai(address : str | None = None):
 
             return response_text
 
+
+def clear_address(address : str | None = None):
+    if address == None:
+         return None
+
+    with open("parser/sys_prompt_clear_address.md", encoding="utf-8") as prompt:
+        system_prompt = prompt.read()
+        
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=address),
+        ]
+        
+        giga_response = model.invoke(messages)
+        response_text = giga_response.content
+
+        try:
+            result = json.loads(response_text)
+        except json.JSONDecodeError as error:
+            print("GigaChat вернул некорректный JSON:")
+            print(response_text)
+            raise ValueError("Ответ GigaChat не является корректным JSON") from error
+        
+        return response_text["address"]
