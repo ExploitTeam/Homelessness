@@ -101,6 +101,7 @@ async def info(user_id: int = Depends(get_current_user_id)):
     answer = []
     for homestay in all_homestays:
         usr = get_user(id_homestay=homestay.id)
+        print(f"Address {homestay.address}, ({homestay.longtitude, homestay.latitude})")
         res = homestay.to_json()
         if usr:
             res["manager_info"] = usr
