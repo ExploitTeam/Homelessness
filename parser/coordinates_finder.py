@@ -1,16 +1,40 @@
 import json
+import re
 import time
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+
 _last_request_time = 0.0
+MOSCOW_CENTER = (55.7558, 37.6173)
+
+
+def _extract_house(text: str) -> str:
+    raw = (text or "").lower().replace(" ", "")
+    raw = (
+        raw.replace("корпус", "к")
+        .replace("корп.", "к")
+        .replace("к.", "к")
+        .replace("строение", "с")
+        .replace("стр.", "с")
+    )
+    matches = re.findall(r"\d+[а-яa-z]?(?:к\d+)?(?:с\d+)?", raw)
+    return matches[-1] if matches else ""
+
+
+def _houses_equal(wanted: str, got: str) -> bool:
+    if not wanted or not got:
+        return False
+    return _extract_house(wanted) == _extract_house(got)
 
 
 def get_coordinates(address: str, city: str | None = None) -> tuple[float, float, bool] | None:
     global _last_request_time
     from parser.neural_network import clear_address
+
     if not address or not address.strip():
         raise ValueError("Адрес не может быть пустым.")
-    address = clear_address(address)
+
+    #address = clear_address(address)
     elapsed = time.monotonic() - _last_request_time
     if elapsed < 1.0:
         time.sleep(1.0 - elapsed)
@@ -18,6 +42,9 @@ def get_coordinates(address: str, city: str | None = None) -> tuple[float, float
     query = address.strip()
     if city and city.lower() not in query.lower():
         query = f"{city}, {query}"
+
+    wanted_house = _extract_house(query)
+    needle = (city or "").lower()
 
     params = urlencode({
         "q": query,
@@ -36,25 +63,23 @@ def get_coordinates(address: str, city: str | None = None) -> tuple[float, float
         data = json.load(response)
 
     if not data:
-        return 55.7558, 37.6173, False
+        return (*MOSCOW_CENTER, False)
 
-    needle = (city or "").lower()
-
-    def score(item: dict) -> int:
-        name = (item.get("display_name") or "").lower()
+    exact = []
+    for item in data:
         addr = item.get("address") or {}
-        points = 0
-        if needle and needle in name:
-            points += 10
-        if needle and needle in (addr.get("city") or addr.get("town") or "").lower():
-            points += 10
-        if item.get("class") == "building" or item.get("type") in {"house", "apartments"}:
-            points += 3
-        return points
+        house = addr.get("house_number") or ""
+        name = (item.get("display_name") or "").lower()
+        place_city = (addr.get("city") or addr.get("town") or addr.get("village") or "").lower()
 
-    best = max(data, key=score)
-    if city and score(best) < 10:
-        # город в запросе есть, но среди ответов его нет — лучше не врать
-        return 55.7558, 37.6173, False
+        if needle and needle not in name and needle not in place_city:
+            continue
+        if wanted_house and not _houses_equal(wanted_house, house):
+            continue
+        exact.append(item)
 
+    if not exact:
+        return (*MOSCOW_CENTER, False)
+
+    best = exact[0]
     return float(best["lat"]), float(best["lon"]), True
