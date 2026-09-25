@@ -18,7 +18,7 @@ model = GigaChat(
 )
 
 def parse_html(html_page):
-    with open("parser/sys_prompt.md", encoding="utf-8") as prompt:
+    with open("parser/sys_prompt_parse.md", encoding="utf-8") as prompt:
         system_prompt = prompt.read()
     
     messages = [
@@ -39,4 +39,45 @@ def parse_html(html_page):
 
     return result
 
-    
+
+def get_coordinates_via_ai(address : str | None = None):
+    if address == None:
+        return ""
+
+    with open("parser/sys_prompt_coordinates.md", encoding="utf-8") as prompt:
+            system_prompt = prompt.read()
+
+            messages = [
+                    SystemMessage(content=system_prompt),
+                    HumanMessage(content=address),
+            ]
+
+            giga_response = model.invoke(messages)
+            response_text = giga_response.content
+
+            return response_text
+
+
+def clear_address(address : str | None = None):
+    if not address:
+         return None
+
+    with open("parser/sys_prompt_clear_address.md", encoding="utf-8") as prompt:
+        system_prompt = prompt.read()
+        
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=address),
+        ]
+        
+        giga_response = model.invoke(messages)
+        response_text = giga_response.content
+
+        try:
+            result = json.loads(response_text)
+        except json.JSONDecodeError as error:
+            print("GigaChat вернул некорректный JSON:")
+            print(response_text)
+            return address
+        
+        return result["address"]

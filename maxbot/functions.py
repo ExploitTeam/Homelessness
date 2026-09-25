@@ -12,7 +12,7 @@ ADMINS = [int(i) for i in os.getenv("MAX_ADMINS_ID", "").split(",")]
 
 start_text = ("Привет{} 👋\n"
               "Это бот, который поможет вам найти место, где можно согреться или переночевать.\n"
-              "Нажмите кнопку «Отправить геопозицию»', чтобы посмотреть ближайшие к вам ночлежки.\n"
+              "Нажмите кнопку «Отправить геопозицию», чтобы посмотреть ближайшие к вам ночлежки.\n"
               "Вы можете открыть мини-пиложение и ознакомиться с пунктами на карте.\n\n"
               "Ваш ID: {}.")
 
@@ -82,8 +82,8 @@ async def do_on_start(bot, usr, msg_id = None):
         usr = User(id, name, 0, "", -1)
         insert_or_update_user(usr)
 
-    if id in ADMINS or usr.user_type == 2:
-        keyboard.add_button("Редактировать пользователя", button_types.callback, payload="edit_user")
+    keyboard.add_button("Редактировать пользователя", button_types.callback, payload="edit_user")
+    if id in ADMINS or usr.user_type in [1, 2]:
         keyboard.add_button("Редактировать пункт помощи", button_types.callback, payload="edit_homestay")
     if name:
         name = f", {name}"
@@ -111,3 +111,27 @@ def safe_json_loads(string_data):
         return json.loads(string_data)
     except (ValueError, TypeError):
         return {}
+
+#=================================
+# Работа со временем
+#=================================
+
+
+from datetime import datetime, time
+
+
+def parse_hhmm(value: str) -> time:
+    return datetime.strptime(value.strip(), "%H:%M").time()
+
+
+def is_point_open(open_str: str, close_str: str, now: datetime | None = None) -> bool:
+    now = now or datetime.now()
+    current = now.time()
+
+    opens_at = parse_hhmm(open_str)
+    closes_at = parse_hhmm(close_str)
+
+    if opens_at <= closes_at:
+        return opens_at <= current < closes_at
+
+    return current >= opens_at or current < closes_at

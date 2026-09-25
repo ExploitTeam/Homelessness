@@ -1,6 +1,6 @@
 /**
 * MapLibre GL JS
-* @license 3-Clause BSD. Full text of license: https://github.com/maplibre/maplibre-gl-js/blob/v6.10.0/LICENSE.txt
+* @license 3-Clause BSD. Full text of license: https://github.com/maplibre/maplibre-gl-js/blob/v6.11.2/LICENSE.txt
 */
 //#region \0rolldown/runtime.js
 var __create = Object.create;
@@ -403,8 +403,6 @@ function isOffscreenCanvasDistorted() {
 	return offscreenCanvasDistorted || false;
 }
 var ARRAY_TYPE = typeof Float32Array !== "undefined" ? Float32Array : Array;
-Math.PI / 180;
-180 / Math.PI;
 /**
 * 2x2 Matrix
 * @module mat2
@@ -2825,8 +2823,10 @@ function getProtocol(url) {
 * Adds a custom load resource function that will be called when using a URL that starts with a custom url schema.
 * This will happen in the main thread, and workers might call it if they don't know how to handle the protocol.
 * The example below will be triggered for custom:// urls defined in the sources list in the style definitions.
-* The function passed will receive the request parameters and should return with the resulting resource,
-* for example a pbf vector tile, non-compressed, represented as ArrayBuffer.
+* The function passed will receive the request parameters and should return with the resulting resource.
+* `requestParameters.type` says which kind of resource is expected. A tile is an `ArrayBuffer`, for example
+* a non-compressed pbf vector tile. An image is either its encoded bytes or an `ImageBitmap`/`HTMLImageElement`,
+* which is used without decoding. See {@link AddProtocolResponseData} for every accepted shape.
 *
 * @param customProtocol - the protocol to hook, for example 'custom'
 * @param loadFn - the function to use when trying to fetch a tile specified by the customProtocol
@@ -2845,6 +2845,12 @@ function getProtocol(url) {
 * // the following is an example of a way to return an error when trying to load a tile
 * addProtocol('custom2', async (params, abortController) => {
 *      throw new Error('someErrorMessage');
+* });
+* // An image handler that draws or computes its tiles can return them decoded, as an ImageBitmap.
+* addProtocol('drawn', async (params, abortController) => {
+*      const canvas = new OffscreenCanvas(256, 256);
+*      // ... draw the tile ...
+*      return {data: await createImageBitmap(canvas)};
 * });
 * ```
 * @see [Add a COG raster source](https://maplibre.org/maplibre-gl-js/docs/examples/add-a-cog-raster-source/)
@@ -13317,6 +13323,11 @@ var PropertyValue = class {
 	getGlobalStateRefs() {
 		return this.expression.globalStateRefs || /* @__PURE__ */ new Set();
 	}
+	/** Whether the expression reads one of the global state keys in `refs`. */
+	readsGlobalState(refs) {
+		const globalStateRefs = this.getGlobalStateRefs();
+		return refs.some((ref) => globalStateRefs.has(ref));
+	}
 	possiblyEvaluate(parameters, canonical, availableImages) {
 		return this.property.possiblyEvaluate(this, parameters, canonical, availableImages);
 	}
@@ -13387,6 +13398,26 @@ var Transitionable = class {
 	setTransition(name, value) {
 		if (!Object.hasOwn(this._values, name)) this._values[name] = new TransitionablePropertyValue(this._values[name].property, this._propertyRootKey(name), this._globalState);
 		this._values[name].transition = clone(value) || void 0;
+	}
+	/** Keeps the transitions running in `transitioning` on `priorGlobalState` where they read one of `refs` live. */
+	retainPriorGlobalState(refs, priorGlobalState, transitioning) {
+		for (const name of Object.keys(transitioning._values)) for (let step = transitioning._values[name]; step; step = step.prior) {
+			const { value } = step;
+			if (!value.property.specification.transition || value.isDataDriven() || value.expression._globalState !== this._globalState || !value.readsGlobalState(refs)) continue;
+			step.value = new PropertyValue(value.property, value.value, this._propertyRootKey(name), priorGlobalState);
+		}
+	}
+	/** Reads every value that reads one of `refs` again and transitions it from what `transitioning` shows. */
+	applyGlobalStateChange(refs, priorGlobalState, transitioning, parameters) {
+		this.retainPriorGlobalState(refs, priorGlobalState, transitioning);
+		let changed = false;
+		for (const name of Object.keys(this._values)) {
+			const { value } = this._values[name];
+			if (!value.readsGlobalState(refs)) continue;
+			this.setValue(name, value.value);
+			changed = true;
+		}
+		return changed ? this.transitioned(parameters, transitioning) : transitioning;
 	}
 	serialize() {
 		const result = {};
@@ -13910,6 +13941,10 @@ var StyleLayer = class extends Evented {
 	}
 	updateTransitions(parameters) {
 		this._transitioningPaint = this._transitionablePaint.transitioned(parameters, this._transitioningPaint);
+	}
+	/** The re-read itself goes through `setPaintProperty`, which also rebuilds colour ramps and relayouts. */
+	retainPriorGlobalState(refs, priorGlobalState) {
+		this._transitionablePaint?.retainPriorGlobalState(refs, priorGlobalState, this._transitioningPaint);
 	}
 	hasTransition() {
 		return this._transitioningPaint.hasTransition();
@@ -23966,7 +24001,7 @@ const breakableBefore = { [40]: true };
 */
 function getGlyphAdvance(grapheme, section, glyphMap, imagePositions, spacing, layoutTextSize) {
 	if ("fontStack" in section) {
-		const positions = glyphMap[section.fontStack];
+		const positions = glyphMap[section.fontStack]?.default;
 		const glyph = positions?.[grapheme];
 		if (glyph) return glyph.metrics.advance * section.scale + spacing;
 		let advance = 0;
@@ -26372,7 +26407,7 @@ function getVerticalAlignFactor(verticalAlign) {
 }
 function getRectAndMetrics(glyphPosition, glyphMap, section, key) {
 	if (glyphPosition?.rect) return glyphPosition;
-	const glyph = glyphMap[section.fontStack]?.[key];
+	const glyph = (glyphMap[section.fontStack]?.default)?.[key];
 	if (!glyph) return null;
 	return {
 		rect: null,
@@ -26506,7 +26541,7 @@ function shapeLines(shaping, glyphMap, glyphPositions, imagePositions, lines, li
 			const grapheme = graphemes[i];
 			const codePoint = grapheme.codePointAt(0);
 			const vertical = lineVerticals ? lineVerticals[i] : isLineVertical(writingMode, allowVerticalPlacement, codePoint);
-			const keys = "fontStack" in section && isCluster(grapheme) && !glyphMap[section.fontStack]?.[grapheme] ? [...grapheme] : [grapheme];
+			const keys = "fontStack" in section && isCluster(grapheme) && !glyphMap[section.fontStack]?.default?.[grapheme] ? [...grapheme] : [grapheme];
 			for (const key of keys) {
 				const positionedGlyph = {
 					glyph: key.codePointAt(0),
@@ -26569,7 +26604,7 @@ function shapeLines(shaping, glyphMap, glyphPositions, imagePositions, lines, li
 	shaping.right = shaping.left + maxLineLength;
 }
 function shapeTextSection(section, key, vertical, lineShapingSize, glyphMap, glyphPositions) {
-	const glyphPosition = glyphPositions[section.fontStack]?.[key];
+	const glyphPosition = (glyphPositions[section.fontStack]?.default)?.[key];
 	const rectAndMetrics = getRectAndMetrics(glyphPosition, glyphMap, section, key);
 	if (rectAndMetrics === null) return null;
 	let baselineOffset;
@@ -27740,7 +27775,7 @@ function performSymbolLayout(args) {
 		}
 		const shapedText = getDefaultHorizontalShaping(shapedTextOrientations.horizontal) || shapedTextOrientations.vertical;
 		args.bucket.iconsInText ||= shapedText ? shapedText.iconsInText : false;
-		if (shapedText || shapedIcon) addFeature(args.bucket, feature, shapedTextOrientations, shapedIcon, args.imageMap, sizes, layoutTextSize, layoutIconSize, textOffset, isSDFIcon, args.canonical, args.subdivisionGranularity);
+		if (shapedText || shapedIcon) addFeature(args.bucket, feature, shapedTextOrientations, shapedIcon, args.imageMap, sizes, layoutTextSize, layoutIconSize, textOffset, isSDFIcon, args.canonical, args.subdivisionGranularity, args.hasPromoteId);
 	}
 	if (args.showCollisionBoxes) args.bucket.generateCollisionDebugBuffers();
 }
@@ -27761,7 +27796,7 @@ function getAnchorJustification(anchor) {
 * (At render it selects which of these instances to
 * show or hide based on collisions with symbols in other layers.)
 */
-function addFeature(bucket, feature, shapedTextOrientations, shapedIcon, imageMap, sizes, layoutTextSize, layoutIconSize, textOffset, isSDFIcon, canonical, subdivisionGranularity) {
+function addFeature(bucket, feature, shapedTextOrientations, shapedIcon, imageMap, sizes, layoutTextSize, layoutIconSize, textOffset, isSDFIcon, canonical, subdivisionGranularity, hasPromoteId) {
 	let textMaxSize = sizes.textMaxSize.evaluate(feature, {});
 	if (textMaxSize === void 0) textMaxSize = layoutTextSize;
 	const layout = bucket.layers[0].layout;
@@ -27782,7 +27817,7 @@ function addFeature(bucket, feature, shapedTextOrientations, shapedIcon, imageMa
 			textPadding,
 			textPadding,
 			textPadding
-		], textAlongLine, textOffset, iconBoxScale, iconPadding, iconAlongLine, iconOffset, feature, sizes, isSDFIcon, canonical, layoutTextSize);
+		], textAlongLine, textOffset, iconBoxScale, iconPadding, iconAlongLine, iconOffset, feature, sizes, isSDFIcon, canonical, layoutTextSize, hasPromoteId);
 	};
 	if (symbolPlacement === "line") for (const line of clipLine(feature.geometry, 0, 0, EXTENT$1, EXTENT$1)) {
 		const subdividedLine = subdivideVertexLine(line, granularity);
@@ -27840,7 +27875,7 @@ function getDefaultHorizontalShaping(horizontalShaping) {
 /**
 * Add a single label & icon placement.
 */
-function addSymbol(bucket, anchor, line, shapedTextOrientations, shapedIcon, imageMap, verticallyShapedIcon, layer, collisionBoxArray, featureIndex, sourceLayerIndex, bucketIndex, textBoxScale, textPadding, textAlongLine, textOffset, iconBoxScale, iconPadding, iconAlongLine, iconOffset, feature, sizes, isSDFIcon, canonical, layoutTextSize) {
+function addSymbol(bucket, anchor, line, shapedTextOrientations, shapedIcon, imageMap, verticallyShapedIcon, layer, collisionBoxArray, featureIndex, sourceLayerIndex, bucketIndex, textBoxScale, textPadding, textAlongLine, textOffset, iconBoxScale, iconPadding, iconAlongLine, iconOffset, feature, sizes, isSDFIcon, canonical, layoutTextSize, hasPromoteId) {
 	const lineArray = bucket.addToLineVertexArray(anchor, line);
 	const elevation = layer.layout.get("symbol-height-offset").evaluate(feature, {}, canonical);
 	if (elevation > bucket.maxHeightOffset) bucket.maxHeightOffset = elevation;
@@ -27918,6 +27953,7 @@ function addSymbol(bucket, anchor, line, shapedTextOrientations, shapedIcon, ima
 	if (feature.sortKey !== void 0) bucket.addToSortKeyRanges(bucket.symbolInstances.length, feature.sortKey);
 	const variableAnchorOffset = getTextVariableAnchorOffset(layer, feature, canonical);
 	const [textAnchorOffsetStartIndex, textAnchorOffsetEndIndex] = addTextVariableAnchorOffsets(bucket.textAnchorOffsets, variableAnchorOffset);
+	if (hasPromoteId) key = keyWithFeatureId(key, feature);
 	bucket.symbolInstances.emplaceBack(anchor.x, anchor.y, placedTextSymbolIndices.right >= 0 ? placedTextSymbolIndices.right : -1, placedTextSymbolIndices.center >= 0 ? placedTextSymbolIndices.center : -1, placedTextSymbolIndices.left >= 0 ? placedTextSymbolIndices.left : -1, placedTextSymbolIndices.vertical || -1, placedIconSymbolIndex, verticalPlacedIconSymbolIndex, key, textBoxStartIndex, textBoxEndIndex, verticalTextBoxStartIndex, verticalTextBoxEndIndex, iconBoxStartIndex, iconBoxEndIndex, verticalIconBoxStartIndex, verticalIconBoxEndIndex, featureIndex, numHorizontalGlyphVertices, numVerticalGlyphVertices, numIconVertices, numVerticalIconVertices, useRuntimeCollisionCircles, 0, textBoxScale, collisionCircleDiameter, textAnchorOffsetStartIndex, textAnchorOffsetEndIndex, elevation);
 }
 function anchorIsTooClose(bucket, text, repeatDistance, anchor) {
@@ -27929,6 +27965,16 @@ function anchorIsTooClose(bucket, text, repeatDistance, anchor) {
 	}
 	compareText[text].push(anchor);
 	return false;
+}
+/**
+* Hashes a promoted feature id into a symbol's cross-tile key, so that labels of different features never compete for
+* a match in the `CrossTileSymbolIndex` even when their text and anchors coincide. Clusters keep the text-only
+* key: supercluster gives a cluster an id that encodes the zoom it formed at, so the same cluster has a different id in
+* every zoom level's tile.
+*/
+function keyWithFeatureId(key, feature) {
+	if (feature.id == null || feature.properties?.cluster) return key;
+	return (0, import_murmurhash_js.default)(String(feature.id), key);
 }
 //#endregion
 //#region src/style/style_layer/overlap_mode.ts
@@ -28107,7 +28153,7 @@ var SymbolBucket = class {
 		for (let i = 0; i < graphemes.length; i++) {
 			const section = tagged.getSection(i);
 			if ("imageName" in section) continue;
-			const stack = stacks[section.fontStack] ||= {};
+			const stack = (stacks[section.fontStack] ||= { default: {} }).default;
 			const grapheme = graphemes[i];
 			if (isCluster(grapheme)) stack[grapheme] = true;
 			for (const char of grapheme) {
@@ -28194,7 +28240,8 @@ var SymbolBucket = class {
 			imagePositions: iconPositions,
 			showCollisionBoxes,
 			canonical,
-			subdivisionGranularity: options.subdivisionGranularity
+			subdivisionGranularity: options.subdivisionGranularity,
+			hasPromoteId: options.featureIndex.promoteId != null
 		});
 	}
 	isEmpty() {
