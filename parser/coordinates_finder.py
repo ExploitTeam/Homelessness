@@ -2,15 +2,15 @@ import json
 import time
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
-
 _last_request_time = 0.0
 
 
 def get_coordinates(address: str, city: str | None = None) -> tuple[float, float, bool] | None:
     global _last_request_time
+    from parser.neural_network import clear_address
     if not address or not address.strip():
         raise ValueError("Адрес не может быть пустым.")
-
+    address = clear_address(address)
     elapsed = time.monotonic() - _last_request_time
     if elapsed < 1.0:
         time.sleep(1.0 - elapsed)

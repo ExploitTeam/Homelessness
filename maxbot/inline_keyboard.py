@@ -29,3 +29,8 @@ class InlineKeyboardMarkup:
         self.keyboard.append([
             dt
         ])
+    def add_buttons_one_line(self, keyboad : list[dict]) -> None:
+        lst = []
+        for i in keyboad:
+            lst.extend(i)
+        self.keyboard.append(lst)

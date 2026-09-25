@@ -59,7 +59,7 @@ def get_coordinates_via_ai(address : str | None = None):
 
 
 def clear_address(address : str | None = None):
-    if address == None:
+    if not address:
          return None
 
     with open("parser/sys_prompt_clear_address.md", encoding="utf-8") as prompt:
@@ -78,6 +78,6 @@ def clear_address(address : str | None = None):
         except json.JSONDecodeError as error:
             print("GigaChat вернул некорректный JSON:")
             print(response_text)
-            raise ValueError("Ответ GigaChat не является корректным JSON") from error
+            return address
         
-        return response_text["address"]
+        return result["address"]
