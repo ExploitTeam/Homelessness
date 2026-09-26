@@ -263,7 +263,7 @@ async def update_booking_info(update, bot):
                  text=(f"❗️ Вы забронировани место в пункте ❗️\n"
                        f"{booking}\n"
                        f"Приходите, мы Вас ждем! 😊"),
-                 btns=keyboard
+                 btns=keyboard.keyboard
                  )
 
 @bot.message_handler(func=lambda msg, tp:
@@ -286,7 +286,7 @@ async def update_booking_info(update, bot):
                        f"Контактный номер: {user.phone_number if user.phone_number else '-'}\n"
                        f"Управлять всеми бронями вы можете по кнопке Бронирования в главном меню\n\n"
                        f"{booking}"),
-                 btns=keyboard_to_start
+                 btns=keyboard_to_start.keyboard
                  )
     await bot.send_msg(booking.user_id, text=(f"❗️ Ваше бронирование подтверждено менеджером!\n"
                                   f"🔵 Обратите внимание, что бронь действует ближайшие сутки. \n\n"
@@ -309,7 +309,7 @@ async def update_booking_info(update, bot):
                  text=(f"❌ Бронирование отменено ❌️\n"
                        f"Управлять всеми бронями вы можете по кнопке Броинварония в главном меню\n\n"
                        f"{booking}"),
-                 btns=keyboard_to_start
+                 btns=keyboard_to_start.keyboard
                  )
     manager = ""
     usr_manager = get_user(id_homestay=booking.homestay_id)
