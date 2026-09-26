@@ -556,7 +556,7 @@ def delete_booking(booking: Booking | None = None) -> bool:
             cursor = conn.cursor()
 
             cursor.execute("""
-                DELETE FROM booking
+                DELETE FROM bookings
                 WHERE id = ?
             """, (booking.id,))
 
