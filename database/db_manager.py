@@ -353,8 +353,7 @@ def insert_or_update_homestay(homestay : Homestay | None = None) -> bool:
     except sqlite3.Error:
         return False
 
-
-def insert_or_update_booking(booking : Booking | None = None) -> bool:
+def insert_or_update_booking(booking: Booking | None = None) -> bool:
     if booking is None:
         return False
 
@@ -363,27 +362,36 @@ def insert_or_update_booking(booking : Booking | None = None) -> bool:
             conn.execute("PRAGMA foreign_keys = ON")
             cursor = conn.cursor()
 
-            cursor.execute("""
-                INSERT INTO bookings (
-                    id,
-                    user_id,
-                    homestay_id,
-                    date_time,
-                    is_approved
-                ) VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT(id) DO UPDATE SET 
-                    user_id = excluded.user_id, 
-                    homestay_id = excluded.homestay_id,
-                    date_time = excluded.date_time,
-                    date_time = excluded.date_time,
-                    is_approved = excluded.is_approved
-            """, (
-                booking.id,
-                booking.user_id,
-                booking.homestay_id,
-                booking.date_time,
-                booking.is_approved,
-            ))
+            if booking.id:
+                cursor.execute("""
+                    INSERT INTO bookings (
+                        id, user_id, homestay_id, date_time, is_approved
+                    ) VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(id) DO UPDATE SET
+                        user_id = excluded.user_id,
+                        homestay_id = excluded.homestay_id,
+                        date_time = excluded.date_time,
+                        is_approved = excluded.is_approved
+                """, (
+                    booking.id,
+                    booking.user_id,
+                    booking.homestay_id,
+                    booking.date_time,
+                    booking.is_approved,
+                ))
+            else:
+                cursor.execute("""
+                    INSERT INTO bookings (
+                        user_id, homestay_id, date_time, is_approved
+                    ) VALUES (?, ?, ?, ?)
+                """, (
+                    booking.user_id,
+                    booking.homestay_id,
+                    booking.date_time,
+                    booking.is_approved,
+                ))
+                booking.id = cursor.lastrowid
+
         return True
 
     except sqlite3.Error as e:

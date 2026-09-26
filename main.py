@@ -63,7 +63,7 @@ async def cleanup_bookings_loop():
                         from maxbot.bot_manager import bot
                         await bot.send_msg(booking.user_id, f"❗️ Ваша бронь была автоматически удалена, "
                                                             f"так как менеджер ее не подтвердил.\n"
-                                                            f"Информация о брони:\n"
+                                                            f"Информация о брони:\n\n"
                                                             f"{booking}")
                     except Exception as e:
                         print(f"Ошибка отправки уведомления: {e}")
