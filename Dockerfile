@@ -1,11 +1,3 @@
-FROM mirror.gcr.io/library/node:22-alpine AS frontend
-
-WORKDIR /web
-COPY Web/package.json Web/package-lock.json* ./
-RUN npm ci --ignore-scripts || npm install
-COPY Web/ ./
-RUN npm run build
-
 FROM mirror.gcr.io/library/python:3.12-slim
 WORKDIR /app
 
@@ -20,8 +12,6 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
-COPY --from=frontend /web/dist /app/Web/dist
 
-VOLUME ["/app/data"]
-
+EXPOSE 8000
 CMD ["python", "main.py"]
