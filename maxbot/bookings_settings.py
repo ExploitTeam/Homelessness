@@ -261,7 +261,7 @@ def _can_manage_bookings(actor) -> bool:
 def _can_manage_homestay(actor, homestay_id: int) -> bool:
     if not _can_manage_bookings(actor):
         return False
-    if actor.user_type == 2:
+    if actor.user_type == 2 or actor.id in ADMINS:
         return True
     return actor.id_homestay is not None and int(actor.id_homestay) == int(homestay_id)
 
