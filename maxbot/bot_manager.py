@@ -249,10 +249,10 @@ async def update_booking_info(update, bot):
     payload = safe_json_loads(update.get("callback", {}).get("payload", ""))
     mid = update.get("message", {}).get("body", {}).get("mid", "")
     booking = get_booking(payload.get("booking_id", -1))
-    if not booking:
+    if booking == -1:
         await bot.edit_msg(mid, f"Такого бронирования не существует. "
                           f"Все бронирования автоматически удаляются через сутки, "
-                          f"не подтвержденные - через 1 час.", keyboard=keyboard.keyboard)
+                          f"не подтвержденные - через 1 час.", keyboard=keyboard_to_start.keyboard)
         return
 
     keyboard = InlineKeyboardMarkup()
@@ -273,7 +273,7 @@ async def update_booking_info(update, bot):
     payload = safe_json_loads(update.get("callback", {}).get("payload", ""))
     mid = update.get("message", {}).get("body", {}).get("mid", "")
     booking = get_booking(payload.get("booking_id", -1))
-    if not booking:
+    if booking == -1:
         await bot.edit_msg(mid, f"Такого бронирования не существует. "
                           f"Все бронирования автоматически удаляются через сутки, "
                           f"не подтвержденные - через 1 час.", keyboard_to_start.keyboard)
@@ -299,7 +299,7 @@ async def update_booking_info(update, bot):
     payload = safe_json_loads(update.get("callback", {}).get("payload", ""))
     mid = update.get("message", {}).get("body", {}).get("mid", "")
     booking = get_booking(payload.get("booking_id", -1))
-    if not booking:
+    if booking == -1:
         await bot.edit_msg(mid, f"Такого бронирования не существует. "
                           f"Все бронирования автоматически удаляются через сутки, "
                           f"не подтвержденные - через 1 час.", keyboard_to_start.keyboard)
