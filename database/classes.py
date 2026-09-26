@@ -3,6 +3,7 @@ from enum import Enum
 from datetime import datetime, timezone
 
 class HomestayTypes(Enum):
+    NO_STATED = 0
     SLEEP = 1
     HOMESTAY = 2
     SHOWER = 3
@@ -13,6 +14,7 @@ class HomestayTypes(Enum):
     @property
     def label(self) -> str:
         translations = {
+            HomestayTypes.NO_STATED: "Не указан",
             HomestayTypes.SLEEP: "Пункт обогрева",
             HomestayTypes.HOMESTAY: "Ночной приют",
             HomestayTypes.SHOWER: "Бесплатный душ",
