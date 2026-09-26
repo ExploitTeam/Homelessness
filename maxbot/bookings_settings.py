@@ -1,11 +1,12 @@
 import json
-
+import os
+import dotenv
 from maxbot.bot_manager import bot, keyboard_to_start, HOMESTAYS_PER_PAGE
 from maxbot.inline_keyboard import InlineKeyboardMarkup, button_types
 from maxbot.functions import safe_json_loads, show_all
 from database.db_manager import *
 from database import db_manager
-
+dotenv.load_dotenv()
 
 MY_BOOKINGS_STEP = "my_bookings"
 MANAGE_BOOKINGS_STEP = "manage_homestay_bookings"
