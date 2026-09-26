@@ -1,0 +1,14 @@
+.git
+.venv
+venv
+ENV
+env
+__pycache__
+*.pyc
+.env
+.idea
+.vscode
+.DS_Store
+Web/node_modules
+data
+homelessness-app.tar.gz
