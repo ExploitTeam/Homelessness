@@ -6,6 +6,7 @@ import urllib.parse
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from starlette import status
 from starlette.staticfiles import StaticFiles
 from maxbot.bot_manager import bot
 import uvicorn
@@ -105,19 +106,20 @@ async def info(user_id: int = Depends(get_current_user_id)):
 
         print(f"Address {homestay.address}, ({homestay.longtitude, homestay.latitude})")
         res = homestay.to_json()
+        res["manager_info"] = {}
         if usr:
             res["manager_info"] = usr
 
         sender_user = get_user(id=user_id)
         bookings = get_user_bookings(sender_user)
         print(f"\nSENDER USER: {sender_user}\nBookings {bookings}\n")
+        res["booking"] = {}
         if bookings:
             for i in bookings:
                 if i.homestay_id == homestay.id:
                     res["booking"] = i.to_json()
                     break
-        else:
-            res["booking"] = {}
+
         answer.append(res)
 
     print("REQUEST ANSWER: \n", {
@@ -183,7 +185,7 @@ async def book(booking: BookingRequest, user_id: int = Depends(get_current_user_
         )
     all_books = get_user_bookings(user)
     if any(i.homestay_id == homestay.id for i in all_books):
-        raise HTTPException(status_code=405, detail="Booking already created")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Booking already created")
 
     user.last_booking = now.isoformat(timespec="seconds")
     insert_or_update_user(user)
