@@ -13,7 +13,7 @@ load_dotenv()
 
 CLEAN_EVERY = timedelta(hours=int(os.getenv("CLEAN_EVERY", 1)))
 UNAPPROVED_TTL = timedelta(minutes=int(os.getenv("UNAPPROVED_TTL", 1)))
-APPROVED_TTL = timedelta(hours=int(os.getenv("APPROVED_TTL", 0)))
+APPROVED_TTL = timedelta(hours=int(os.getenv("APPROVED_TTL", 1)))
 
 
 def _booking_age(booking):
