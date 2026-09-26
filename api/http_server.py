@@ -221,6 +221,7 @@ async def book(booking: BookingRequest, user_id: int = Depends(get_current_user_
             "command": "update_booking_info",
             "booking_id": new_booking.id,
         }))
+        keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
         await send_bot_msg(user.id, text=(f"❗️ Вы забронировани место в пункте ❗️\n"
                                     f"{new_booking}\n"
                                     f"Приходите, мы Вас ждем! 😊"), keyboard=keyboard.keyboard)

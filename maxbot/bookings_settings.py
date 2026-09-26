@@ -72,15 +72,37 @@ def _list_user_bookings(user) -> list:
     return get_user_bookings(user) or []
 
 
+def _as_booking(item):
+    if item is None:
+        return None
+    if hasattr(item, "homestay_id") and hasattr(item, "user_id"):
+        return item
+    if isinstance(item, int):
+        try:
+            return get_booking(id=item)
+        except TypeError:
+            return get_booking(item)
+    return None
+
+
 def _list_homestay_bookings(homestay_id: int) -> list:
+    raw = []
     if hasattr(db_manager, "get_homestay_bookings"):
         try:
-            return db_manager.get_homestay_bookings(homestay_id) or []
+            raw = db_manager.get_homestay_bookings(homestay_id) or []
         except TypeError:
-            return db_manager.get_homestay_bookings(homestay_id=homestay_id) or []
-    if hasattr(db_manager, "get_all_bookings"):
-        return [b for b in (db_manager.get_all_bookings() or []) if b.homestay_id == homestay_id]
-    return []
+            raw = db_manager.get_homestay_bookings(homestay_id=homestay_id) or []
+    elif hasattr(db_manager, "get_all_bookings"):
+        raw = db_manager.get_all_bookings() or []
+    else:
+        return []
+
+    bookings = []
+    for item in raw:
+        booking = _as_booking(item)
+        if booking and booking.homestay_id == homestay_id:
+            bookings.append(booking)
+    return bookings
 
 
 def _managed_homestays(actor) -> list:
@@ -99,7 +121,7 @@ def _format_bookings(bookings: list) -> str:
 
 
 def _restore_bed(booking) -> None:
-    homestay = get_homestay(booking.homestay_id)
+    homestay = get_homestay(id=booking.homestay_id)
     if not homestay:
         return
     homestay.available_beds = (homestay.available_beds or 0) + 1
@@ -174,7 +196,7 @@ async def delete_my_booking(update, bot):
     user_id = _callback_user_id(update)
     mid = _callback_mid(update)
     payload = safe_json_loads(update.get("callback", {}).get("payload", ""))
-    booking = get_booking(payload.get("booking_id", -1))
+    booking = get_booking(id=payload.get("booking_id", -1))
     page = int(payload.get("page") or 1)
 
     if booking and booking.user_id == user_id:
@@ -240,7 +262,7 @@ async def open_manage_bookings(update, bot):
 
 
 def _build_manage_homestay_view(homestay_id: int, page: int):
-    homestay = get_homestay(homestay_id)
+    homestay = get_homestay(id=homestay_id)
     items = _list_homestay_bookings(homestay_id)
     page_items, page, pages = _paginate(items, page)
     title = homestay.address if homestay else f"пункт #{homestay_id}"
@@ -340,7 +362,7 @@ async def staff_approve_booking(update, bot):
         await bot.edit_msg(mid, "⛔ Недостаточно прав.", keyboard_to_start.keyboard)
         return
 
-    booking = get_booking(payload.get("booking_id", -1))
+    booking = get_booking(id=payload.get("booking_id", -1))
     if booking:
         booking.is_approved = 1
         insert_or_update_booking(booking)
@@ -369,7 +391,7 @@ async def staff_delete_booking(update, bot):
         await bot.edit_msg(mid, "⛔ Недостаточно прав.", keyboard_to_start.keyboard)
         return
 
-    booking = get_booking(payload.get("booking_id", -1))
+    booking = get_booking(id=payload.get("booking_id", -1))
     if booking:
         manager_info = ""
         usr_manager = get_user(id_homestay=booking.homestay_id)
@@ -397,7 +419,7 @@ safe_json_loads(msg.get("callback", {}).get("payload", "")).get("command") == "u
 async def update_booking_info(update, bot):
     payload = safe_json_loads(update.get("callback", {}).get("payload", ""))
     mid = _callback_mid(update)
-    booking = get_booking(payload.get("booking_id", -1))
+    booking = get_booking(id=payload.get("booking_id", -1))
     if not booking:
         await bot.edit_msg(
             mid,
@@ -425,7 +447,7 @@ safe_json_loads(msg.get("callback", {}).get("payload", "")).get("command") == "a
 async def approve_booking_from_card(update, bot):
     payload = safe_json_loads(update.get("callback", {}).get("payload", ""))
     payload["homestay_id"] = payload.get("homestay_id")
-    booking = get_booking(payload.get("booking_id", -1))
+    booking = get_booking(id=payload.get("booking_id", -1))
     if booking and payload.get("homestay_id") is None:
         payload["homestay_id"] = booking.homestay_id
         payload["page"] = 1
@@ -437,7 +459,7 @@ async def approve_booking_from_card(update, bot):
 safe_json_loads(msg.get("callback", {}).get("payload", "")).get("command") == "delete_booking")
 async def delete_booking_from_card(update, bot):
     payload = safe_json_loads(update.get("callback", {}).get("payload", ""))
-    booking = get_booking(payload.get("booking_id", -1))
+    booking = get_booking(id=payload.get("booking_id", -1))
     if booking and payload.get("homestay_id") is None:
         payload["homestay_id"] = booking.homestay_id
         payload["page"] = 1
