@@ -108,8 +108,9 @@ async def info(user_id: int = Depends(get_current_user_id)):
         if usr:
             res["manager_info"] = usr
         bookings = get_user_bookings(get_user(id=user_id))
+        print(f"\nBookings {bookings}\n")
         if bookings:
-            res["booking"] = [i for i in bookings if i.homestay_id == homestay.id]
+            res["booking"] = [i.to_json() for i in bookings if i.homestay_id == homestay.id]
         else:
             res["booking"] = []
         answer.append(res)

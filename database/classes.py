@@ -130,6 +130,15 @@ class Booking:
         self.date_time = date_time
         self.is_approved = is_approved
 
+    def to_json(self):
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "homestay_id": self.homestay_id,
+            "date_time": self.date_time,
+            "is_approved": self.is_approved
+        }
+
     def booking_age(self):
         if not self.date_time:
             return None
