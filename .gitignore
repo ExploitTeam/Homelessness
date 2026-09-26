@@ -36,4 +36,6 @@ __pycache__/
 .DS_Store
 .AppleDouble
 .LSOverride
-
+database.db
+database.db.sqbpro
+Web/dist
