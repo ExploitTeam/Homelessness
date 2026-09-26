@@ -183,6 +183,7 @@ def _build_my_bookings_view(user, page: int):
     text = f"{header}\n\n{_format_bookings(page_items)}"
 
     keyboard = InlineKeyboardMarkup()
+    keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
     _add_pager(keyboard, page, pages, len(items), "my_bookings_page")
     for booking in page_items:
         keyboard.add_button(
@@ -194,7 +195,6 @@ def _build_my_bookings_view(user, page: int):
                 "page": page,
             }),
         )
-    keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
     return text, keyboard, page
 
 
@@ -305,7 +305,8 @@ def _build_manage_homestay_view(homestay_id: int, page: int):
     text = f"{header}\n\n{_format_bookings(page_items)}"
 
     keyboard = InlineKeyboardMarkup()
-    _add_pager(
+    keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
+    keyboard.add_button("⬅️ К пунктам", button_types.callback, payload="manage_bookings")    _add_pager(
         keyboard, page, pages, len(items),
         "manage_homestay_bookings_page",
         {"homestay_id": homestay_id},
@@ -334,8 +335,6 @@ def _build_manage_homestay_view(homestay_id: int, page: int):
                 }),
             )
         keyboard.add_buttons_one_line(row.keyboard)
-    keyboard.add_button("⬅️ К пунктам", button_types.callback, payload="manage_bookings")
-    keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
     return text, keyboard, page
 
 
@@ -463,11 +462,11 @@ async def update_booking_info(update, bot):
         )
         return
     keyboard = InlineKeyboardMarkup()
+    keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
     keyboard.add_button("🔄 Обновить", button_types.callback, json.dumps({
         "command": "update_booking_info",
         "booking_id": booking.id,
     }))
-    keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
     await bot.edit_msg(
         mid,
         f"❗️ Вы забронировали место в пункте ❗️\n{booking}\nПриходите, мы Вас ждем! 😊",
