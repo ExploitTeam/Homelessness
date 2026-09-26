@@ -231,7 +231,7 @@ def get_booking(id: int | None = None) -> Booking | None:
             id = row[0],
             user_id = row[1],
             homestay_id = row[2],
-            date = row[3],
+            date_time = row[3],
             is_approved = row[5],
         )
 
