@@ -252,7 +252,7 @@ async def update_booking_info(update, bot):
     if not booking:
         await bot.edit_msg(mid, f"Такого бронирования не существует. "
                           f"Все бронирования автоматически удаляются через сутки, "
-                          f"не подтвержденные - через 1 час.", keyboard=keyboard_to_start.keyboard)
+                          f"не подтвержденные - через 1 час.", btns=keyboard_to_start.keyboard)
         return
     keyboard = InlineKeyboardMarkup()
     keyboard.add_button("🔄 Обновить", button_types.callback, json.dumps({
@@ -286,7 +286,7 @@ async def update_booking_info(update, bot):
                        f"Контактный номер: {user.phone_number if user.phone_number else '-'}\n"
                        f"Управлять всеми бронями вы можете по кнопке Бронирования в главном меню\n\n"
                        f"{booking}"),
-                 keyboard=keyboard_to_start
+                 btns=keyboard_to_start
                  )
     await bot.send_msg(booking.user_id, f"❗️ Ваше бронирование подтверждено менеджером!\n"
                                   f"🔵 Обратите внимание, что бронь действует ближайшие сутки. \n\n"
@@ -309,7 +309,7 @@ async def update_booking_info(update, bot):
                  text=(f"❌ Бронирование отменено ❌️\n"
                        f"Управлять всеми бронями вы можете по кнопке Броинварония в главном меню\n\n"
                        f"{booking}"),
-                 keyboard=keyboard_to_start
+                 btns=keyboard_to_start
                  )
     manager = ""
     usr_manager = get_user(id_homestay=booking.homestay_id)
@@ -318,5 +318,6 @@ async def update_booking_info(update, bot):
         phone = usr_manager.phone_number
         manager = (f"😎 Менеджер: {name if name else '-'}\n"
                    f"📱 Телефон менеджера: {phone if phone else '-'}\n")
-    await bot.send_msg(booking.user_id, f"❌️ Ваше бронирование удалено менеджером!\n"
-                                  f"{manager}", keyboard_to_start.keyboard)
+    await bot.send_msg(booking.user_id, text = (f"❌️ Ваше бронирование удалено менеджером!\n"
+                                    f"{manager}"),
+                       btns=keyboard_to_start.keyboard)

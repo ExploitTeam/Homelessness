@@ -386,7 +386,8 @@ def insert_or_update_booking(booking : Booking | None = None) -> bool:
             ))
         return True
 
-    except sqlite3.Error:
+    except sqlite3.Error as e:
+        print(f"\n\nSQL ERROR: {e}")
         return False
 
 
