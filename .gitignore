@@ -38,4 +38,3 @@ __pycache__/
 .LSOverride
 database.db
 database.db.sqbpro
-Web/dist
