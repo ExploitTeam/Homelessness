@@ -37,6 +37,7 @@ def show_all(name=None, get_in_dict=False):
 
 def generate_buttons_by_user_privilege(usr, msg_id, me, no_edit=False):
     keyboard = InlineKeyboardMarkup()
+    keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
     keyboard.add_button("Изменить номер", button_types.callback, payload=json.dumps({
         "command": "change_number",
         "user": usr.id,
