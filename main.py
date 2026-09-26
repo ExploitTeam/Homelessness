@@ -12,8 +12,8 @@ from database.db_manager import get_all_bookings, delete_booking, get_homestay, 
 load_dotenv()
 
 CLEAN_EVERY = timedelta(hours=int(os.getenv("CLEAN_EVERY", 1)))
-UNAPPROVED_TTL = timedelta(minutes=int(os.getenv("UNAPPROVED_TTL", 1)))
-APPROVED_TTL = timedelta(hours=int(os.getenv("APPROVED_TTL", 1)))
+UNAPPROVED_TTL = timedelta(hours=int(os.getenv("UNAPPROVED_TTL", 3)))
+APPROVED_TTL = timedelta(hours=int(os.getenv("APPROVED_TTL", 24)))
 
 
 def _booking_age(booking):
