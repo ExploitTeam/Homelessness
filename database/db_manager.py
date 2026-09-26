@@ -64,8 +64,7 @@ def initialize_database():
                 id INTEGER PRIMARY KEY,
                 user_id INTEGER,
                 homestay_id INTEGER,
-                date TEXT NOT NULL,
-                time TEXT NOT NULL,
+                date_time TEXT NOT NULL,
                 is_approved INTEGER DEFAULT 0,
 
                 FOREIGN KEY (user_id) REFERENCES users(id),
@@ -215,8 +214,7 @@ def get_booking(id: int | None = None) -> Booking | None:
                 id,
                 user_id,
                 homestay_id,
-                date,
-                time,
+                date_time,
                 is_approved
             FROM bookings
             WHERE id = ?
@@ -234,7 +232,6 @@ def get_booking(id: int | None = None) -> Booking | None:
             user_id = row[1],
             homestay_id = row[2],
             date = row[3],
-            time = row[4],
             is_approved = row[5],
         )
 
@@ -371,10 +368,9 @@ def insert_or_update_booking(booking : Booking | None = None) -> bool:
                     id,
                     user_id,
                     homestay_id,
-                    date,
-                    time,
+                    date_time,
                     is_approved
-                ) VALUES (?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET 
                     user_id = excluded.user_id, 
                     homestay_id = excluded.homestay_id,
@@ -385,8 +381,7 @@ def insert_or_update_booking(booking : Booking | None = None) -> bool:
                 booking.id,
                 booking.user_id,
                 booking.homestay_id,
-                booking.date,
-                booking.time,
+                booking.date_time,
                 booking.is_approved,
             ))
         return True
@@ -451,8 +446,7 @@ def get_user_bookings(user : User | None = None) -> list[Booking]:
                     id,
                     user_id,
                     homestay_id,
-                    date,
-                    time,
+                    date_time,
                     is_approved
                 FROM bookings
                 WHERE user_id = ?
@@ -465,8 +459,7 @@ def get_user_bookings(user : User | None = None) -> list[Booking]:
                     id = row[0],
                     user_id = row[1],
                     homestay_id = row[2],
-                    date = row[3],
-                    time = row[4],
+                    date_time = row[3],
                     is_approved = row[5],
                 )
                 for row in rows
@@ -486,8 +479,7 @@ def get_homestay_bookings(homestay : Homestay | None = None) -> list[Booking]:
                     id,
                     user_id,
                     homestay_id,
-                    date,
-                    time,
+                    date_time,
                     is_approved
                 FROM bookings
                 WHERE homestay_id = ?
@@ -500,8 +492,7 @@ def get_homestay_bookings(homestay : Homestay | None = None) -> list[Booking]:
                     id = row[0],
                     user_id = row[1],
                     homestay_id = row[2],
-                    date = row[3],
-                    time = row[4],
+                    date_time = row[3],
                     is_approved = row[5],
                 )
                 for row in rows

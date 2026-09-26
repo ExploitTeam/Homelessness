@@ -1,6 +1,6 @@
 import parser.coordinates_finder as coordinates_finder
 from enum import Enum
-
+from datetime import datetime, timezone
 
 class HomestayTypes(Enum):
     SLEEP = 1
@@ -86,8 +86,6 @@ class Homestay:
         from database.db_manager import get_user
         from maxbot.functions import is_point_open
         usr = get_user(id_homestay=self.id)
-        name = ""
-        phone = ""
         manager = ""
         if usr:
             name = usr.username
@@ -124,17 +122,46 @@ class Homestay:
 
 class Booking:
     def __init__(self, id : int = 0, user_id : int | None = None,
-                 homestay_id : int | None = None, date : str | None = None,
-                 time : str | None = None, is_approved : int = 0):
+                 homestay_id : int | None = None, date_time : str | None = None,
+                 is_approved : int = 0):
         self.id = id
         self.user_id = user_id
         self.homestay_id = homestay_id
-        self.date = date
-        self.time = time
+        self.date_time = date_time
         self.is_approved = is_approved
+
+    def booking_age(self):
+        if not self.date_time:
+            return None
+        created = datetime.fromisoformat(self.date_time)
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        return datetime.now(timezone.utc) - created
 
 
     def __str__(self):
-        from database.db_manager import get_booking
-        homestay = get_booking(self.id)
-        pass
+        from database.db_manager import get_homestay, get_user
+        from maxbot.functions import is_point_open
+
+        homestay = get_homestay(self.homestay_id)
+        user = get_user(self.user_id)
+        if not homestay or not user:
+            return f"Бронирование с ID {self.id} недействительно. "
+
+        manager = ""
+        usr_manager = get_user(id_homestay=homestay.id)
+        if usr_manager:
+            name = usr_manager.username
+            phone = usr_manager.phone_number
+            manager = (f"😎 Менеджер: {name if name else '-'}\n"
+                       f"📱 Телефон менеджера: {phone if phone else '-'}\n")
+
+        return (f"ID бронирования: {self.id}\n"
+                f"Дата: {datetime.fromisoformat(self.date_time)}"
+                f"📍 Адрес пункта: {homestay.address}\n"
+                f"⚡️ Тип: {HomestayTypes(homestay.homestay_type).label}\n"
+                f"⏳ Часы работы: {homestay.open_time} - {homestay.close_time}\n"
+                f"{'🟢  СЕЙЧАС ОТКРЫТ\n' if is_point_open(homestay.open_time, homestay.close_time) and homestay.is_working
+                else '🔴  СЕЙЧАС ЗАКРЫТ\n' if homestay.is_working else ''}"
+                f"{manager}\n"
+                f"{'🟢 Бронирование подтверждено' if self.is_approved else '🔴 Бронирование не подтверждено'}")

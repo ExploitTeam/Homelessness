@@ -16,6 +16,7 @@ import jwt
 from fastapi.responses import FileResponse
 from database.db_manager import *
 from maxbot.functions import is_point_open
+from maxbot.inline_keyboard import InlineKeyboardMarkup, button_types
 
 app = FastAPI(title="HOMELESSNESS API")
 
@@ -121,7 +122,7 @@ class BookingRequest(BaseModel):
     id_homestay: int
 
 
-BOOKING_COOLDOWN = timedelta(minutes=5) # тайаут на следующее бронирование
+BOOKING_COOLDOWN = timedelta(seconds=5) # тайаут на следующее бронирование
 
 def _parse_last_booking(value: str | None) -> datetime | None:
     if value is None:
@@ -168,32 +169,47 @@ async def book(booking: BookingRequest, user_id: int = Depends(get_current_user_
             status_code=429,
             detail=f"Повторное бронирование можно сделать через {wait_sec} сек."
         )
+    all_books = get_user_bookings(user)
+    if any(i.homestay_id == homestay.id for i in all_books):
+        raise HTTPException(status_code=405, detail="Booking already created")
 
     user.last_booking = now.isoformat(timespec="seconds")
     insert_or_update_user(user)
-
+    new_booking = Booking(user_id=user_id, homestay_id=homestay.id, date_time=now.isoformat(timespec="seconds"))
+    insert_or_update_booking(new_booking)
     homestay.available_beds -= 1
     insert_or_update_homestay(homestay)
     manager = get_user(id_homestay=homestay.id)
-    manager_info = ""
     if manager:
-        manager_info = (f"👤 Менеджер пункта: {manager.username}\n"
-                        f"📱 Телефон менеджера: {manager.phone_number if manager.phone_number else '-'}")
         try:
-            await send_bot_msg(manager.id, text=(f"Новая заявка!\n"
-                                           f"Заявку оставил {user.username}\n"
-                                           f"Контактный номер: {user.phone_number if user.phone_number else '-'}\n"))
+            keyboard = InlineKeyboardMarkup()
+            horizontal_keyboard = InlineKeyboardMarkup()
+            horizontal_keyboard.add_button(f"✅ Подтвердить", button_types.callback, json.dumps({
+                "command": "approve_booking",
+                "booking_id": new_booking.id,
+            }))
+            horizontal_keyboard.add_button(f"❌ Отклонить", button_types.callback, json.dumps({
+                "command": "delete_booking",
+                "booking_id": new_booking.id,
+            }))
+            keyboard.add_buttons_one_line(horizontal_keyboard.keyboard)
+            await send_bot_msg(manager.id, text=(f"Новая заявка! "
+                                                 f"Подтвердите ее, или она автоматически удалится через 1 час.\n"
+                                                 f"Заявку оставил {user.username}\n"
+                                                 f"Контактный номер: {user.phone_number if user.phone_number else '-'}\n\n"
+                                                 f"Бронирование\n{new_booking}"), keyboard=keyboard.keyboard)
         except Exception as e:
             print("ERROR:", e)
 
     try:
-        await send_bot_msg(user.id, text=(f"❗️ Вы оставили заявку в пункт по адресу {homestay.address}.\n"
-                                    f"{'🟢 СЕЙЧАС ПУНКТ ОТКРЫТ\n' if is_point_open(homestay.open_time, homestay.close_time) 
-                                                               and homestay.is_working
-                                    else '🔴  СЕЙЧАС ПУНКТ ЗАКРЫТ\n' if homestay.is_working else ''}"
-                                    f"⏱️ Время работы пункта: {homestay.open_time} - {homestay.close_time}\n"
-                                    f"{manager_info}\n\n"
-                                    f"Приходите, мы Вас ждем! 😊"))
+        keyboard = InlineKeyboardMarkup()
+        keyboard.add_button("🔄 Обновить", button_types.callback, json.dumps({
+            "command": "update_booking_info",
+            "booking_id": new_booking.id,
+        }))
+        await send_bot_msg(user.id, text=(f"❗️ Вы забронировани место в пункте ❗️\n"
+                                    f"{new_booking}"
+                                    f"Приходите, мы Вас ждем! 😊"), keyboard=keyboard.keyboard)
     except Exception as e:
         print("ERROR:", e)
 
@@ -202,6 +218,7 @@ async def book(booking: BookingRequest, user_id: int = Depends(get_current_user_
         "message": f"User {user_id} booked homestay {booking.id_homestay}",
         "last_booking": user.last_booking,
         "available_beds": homestay.available_beds,
+        "booking_id": new_booking.id,
     }
 
 import asyncio

@@ -242,3 +242,82 @@ async def change_geo_page(update, bot):
     selected_types = list(step.get("types") or [])
     page = int(step.get("page") or 1) + direction
     await _update_geo_message(update, bot, selected_types, page, step)
+
+@bot.message_handler(func=lambda msg, tp:
+safe_json_loads(msg.get("callback", {}).get("payload", "")).get("command") == "update_booking_info")
+async def update_booking_info(update, bot):
+    payload = safe_json_loads(update.get("callback", {}).get("payload", ""))
+    mid = update.get("callback", {}).get("body", {}).get("mid")
+    booking = get_booking(payload.get("booking_id", -1))
+    if not booking:
+        bot.edit_msg(mid, f"Такого бронирования не существует. "
+                          f"Все бронирования автоматически удаляются через сутки, "
+                          f"не подтвержденные - через 1 час.")
+        return
+
+    keyboard = InlineKeyboardMarkup()
+    keyboard.add_button("🔄 Обновить", button_types.callback, json.dumps({
+        "command": "update_booking_info",
+        "booking_id": booking.id,
+    }))
+    bot.edit_msg(mid,
+                 text=(f"❗️ Вы забронировани место в пункте ❗️\n"
+                       f"{booking}"
+                       f"Приходите, мы Вас ждем! 😊"),
+                 keyboard=keyboard
+                 )
+
+@bot.message_handler(func=lambda msg, tp:
+safe_json_loads(msg.get("callback", {}).get("payload", "")).get("command") == "approve_booking")
+async def update_booking_info(update, bot):
+    payload = safe_json_loads(update.get("callback", {}).get("payload", ""))
+    mid = update.get("callback", {}).get("body", {}).get("mid")
+    booking = get_booking(payload.get("booking_id", -1))
+    user = get_user(id=booking.user_id)
+    if not booking:
+        bot.edit_msg(mid, f"Такого бронирования не существует. "
+                          f"Все бронирования автоматически удаляются через сутки, "
+                          f"не подтвержденные - через 1 час.")
+        return
+    booking.approved = 1
+    insert_or_update_booking(booking)
+    bot.edit_msg(mid,
+                 text=(f"❗️ Бронирование подтверждено ❗️\n"
+                       f"Заявку оставил {user.username}\n"
+                       f"Контактный номер: {user.phone_number if user.phone_number else '-'}\n"
+                       f"Управлять всеми бронями вы можете по кнопке Броинварония в главном меню\n\n"
+                       f"{booking}"),
+                 keyboard=keyboard_to_start
+                 )
+    bot.send_msg(booking.user_id, f"❗️ Ваше бронирование подтверждено менеджером!\n"
+                                  f"🔵 Обратите внимание, что бронь действует ближайшие сутки. \n\n"
+                                  f"{booking}")
+
+@bot.message_handler(func=lambda msg, tp:
+safe_json_loads(msg.get("callback", {}).get("payload", "")).get("command") == "delete_booking")
+async def update_booking_info(update, bot):
+    payload = safe_json_loads(update.get("callback", {}).get("payload", ""))
+    mid = update.get("callback", {}).get("body", {}).get("mid")
+    booking = get_booking(payload.get("booking_id", -1))
+    if not booking:
+        bot.edit_msg(mid, f"Такого бронирования не существует. "
+                          f"Все бронирования автоматически удаляются через сутки, "
+                          f"не подтвержденные - через 1 час.")
+        return
+    booking.approved = 1
+    insert_or_update_booking(booking)
+    bot.edit_msg(mid,
+                 text=(f"❌ Бронирование отменено ❌️\n"
+                       f"Управлять всеми бронями вы можете по кнопке Броинварония в главном меню\n\n"
+                       f"{booking}"),
+                 keyboard=keyboard_to_start
+                 )
+    manager = ""
+    usr_manager = get_user(id_homestay=booking.homestay_id)
+    if usr_manager:
+        name = usr_manager.username
+        phone = usr_manager.phone_number
+        manager = (f"😎 Менеджер: {name if name else '-'}\n"
+                   f"📱 Телефон менеджера: {phone if phone else '-'}\n")
+    bot.send_msg(booking.user_id, f"❌️ Ваше бронирование удалено менеджером!\n"
+                                  f"{manager}")
