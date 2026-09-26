@@ -9,7 +9,7 @@ from database import db_manager
 
 MY_BOOKINGS_STEP = "my_bookings"
 MANAGE_BOOKINGS_STEP = "manage_homestay_bookings"
-
+ADMINS = [int(i) for i in os.getenv("MAX_ADMINS_ID", "").split(",")]
 
 def _page_count(total: int) -> int:
     if total <= 0:
@@ -254,7 +254,7 @@ async def delete_my_booking(update, bot):
 # =====================================================================
 
 def _can_manage_bookings(actor) -> bool:
-    return bool(actor) and actor.user_type in (1, 2)
+    return bool(actor) and (actor.user_type in (1, 2) or actor.id in ADMINS)
 
 
 def _can_manage_homestay(actor, homestay_id: int) -> bool:
