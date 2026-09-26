@@ -69,7 +69,16 @@ def _add_pager(keyboard: InlineKeyboardMarkup, page: int, pages: int, total: int
 def _list_user_bookings(user) -> list:
     if not user:
         return []
-    return get_user_bookings(user) or []
+    try:
+        raw = get_user_bookings(user) or []
+    except Exception:
+        raw = get_user_bookings(id=user.id) if hasattr(user, "id") else []
+    bookings = []
+    for item in raw:
+        booking = _as_booking(item)
+        if booking:
+            bookings.append(booking)
+    return bookings
 
 
 def _as_booking(item):
@@ -85,22 +94,31 @@ def _as_booking(item):
     return None
 
 
+def _safe_call(fn, *args, **kwargs):
+    try:
+        return fn(*args, **kwargs)
+    except Exception as error:
+        print("BOOKINGS DB CALL FAILED:", fn, error)
+        return None
+
+
 def _list_homestay_bookings(homestay_id: int) -> list:
-    raw = []
-    if hasattr(db_manager, "get_homestay_bookings"):
-        try:
-            raw = db_manager.get_homestay_bookings(homestay_id) or []
-        except TypeError:
-            raw = db_manager.get_homestay_bookings(homestay_id=homestay_id) or []
-    elif hasattr(db_manager, "get_all_bookings"):
-        raw = db_manager.get_all_bookings() or []
-    else:
-        return []
+    raw = None
+
+    if hasattr(db_manager, "get_all_bookings"):
+        raw = _safe_call(db_manager.get_all_bookings)
+
+    if raw is None and hasattr(db_manager, "get_homestay_bookings"):
+        raw = _safe_call(db_manager.get_homestay_bookings, homestay_id=homestay_id)
+        if raw is None:
+            homestay = _safe_call(get_homestay, id=homestay_id)
+            if homestay is not None and not isinstance(homestay, int):
+                raw = _safe_call(db_manager.get_homestay_bookings, homestay)
 
     bookings = []
-    for item in raw:
+    for item in raw or []:
         booking = _as_booking(item)
-        if booking and booking.homestay_id == homestay_id:
+        if booking and int(booking.homestay_id) == int(homestay_id):
             bookings.append(booking)
     return bookings
 
@@ -114,10 +132,25 @@ def _managed_homestays(actor) -> list:
     return []
 
 
+def _format_booking(booking) -> str:
+    homestay = _safe_call(get_homestay, id=booking.homestay_id)
+    user = _safe_call(get_user, id=booking.user_id)
+    address = getattr(homestay, "address", None) or "-"
+    username = getattr(user, "username", None) or "-"
+    approved = "🟢 Бронирование подтверждено" if booking.is_approved else "🔴 Бронирование не подтверждено"
+    return (
+        f"ID бронирования: {booking.id}\n"
+        f"Дата: {booking.date_time}\n"
+        f"👤 Пользователь: {username}\n"
+        f"📍 Адрес пункта: {address}\n"
+        f"{approved}"
+    )
+
+
 def _format_bookings(bookings: list) -> str:
     if not bookings:
         return "Бронирований нет."
-    return "\n\n".join(str(b) for b in bookings)
+    return "\n\n".join(_format_booking(b) for b in bookings)
 
 
 def _restore_bed(booking) -> None:
