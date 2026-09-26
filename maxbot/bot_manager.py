@@ -247,12 +247,12 @@ async def change_geo_page(update, bot):
 safe_json_loads(msg.get("callback", {}).get("payload", "")).get("command") == "update_booking_info")
 async def update_booking_info(update, bot):
     payload = safe_json_loads(update.get("callback", {}).get("payload", ""))
-    mid = update.get("callback", {}).get("body", {}).get("mid")
+    mid = update.get("message", {}).get("body", {}).get("mid", "")
     booking = get_booking(payload.get("booking_id", -1))
     if not booking:
         await bot.edit_msg(mid, f"Такого бронирования не существует. "
                           f"Все бронирования автоматически удаляются через сутки, "
-                          f"не подтвержденные - через 1 час.")
+                          f"не подтвержденные - через 1 час.", keyboard=keyboard.keyboard)
         return
 
     keyboard = InlineKeyboardMarkup()
@@ -271,7 +271,7 @@ async def update_booking_info(update, bot):
 safe_json_loads(msg.get("callback", {}).get("payload", "")).get("command") == "approve_booking")
 async def update_booking_info(update, bot):
     payload = safe_json_loads(update.get("callback", {}).get("payload", ""))
-    mid = update.get("callback", {}).get("body", {}).get("mid")
+    mid = update.get("message", {}).get("body", {}).get("mid", "")
     booking = get_booking(payload.get("booking_id", -1))
     if not booking:
         await bot.edit_msg(mid, f"Такого бронирования не существует. "
@@ -297,7 +297,7 @@ async def update_booking_info(update, bot):
 safe_json_loads(msg.get("callback", {}).get("payload", "")).get("command") == "delete_booking")
 async def update_booking_info(update, bot):
     payload = safe_json_loads(update.get("callback", {}).get("payload", ""))
-    mid = update.get("callback", {}).get("body", {}).get("mid")
+    mid = update.get("message", {}).get("body", {}).get("mid", "")
     booking = get_booking(payload.get("booking_id", -1))
     if not booking:
         await bot.edit_msg(mid, f"Такого бронирования не существует. "
