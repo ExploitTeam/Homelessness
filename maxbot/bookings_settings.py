@@ -126,7 +126,7 @@ def _list_homestay_bookings(homestay_id: int) -> list:
 
 def _managed_homestays(actor) -> list:
     all_homestays = show_all(get_in_dict=True)
-    if actor.user_type == 2:
+    if actor.user_type == 2 or actor.id in ADMINS:
         return all_homestays
     if actor.user_type == 1 and actor.id_homestay:
         return [h for h in all_homestays if h.id == actor.id_homestay]
