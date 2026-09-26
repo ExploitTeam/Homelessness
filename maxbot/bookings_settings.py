@@ -306,7 +306,8 @@ def _build_manage_homestay_view(homestay_id: int, page: int):
 
     keyboard = InlineKeyboardMarkup()
     keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
-    keyboard.add_button("⬅️ К пунктам", button_types.callback, payload="manage_bookings")    _add_pager(
+    keyboard.add_button("⬅️ К пунктам", button_types.callback, payload="manage_bookings")
+    _add_pager(
         keyboard, page, pages, len(items),
         "manage_homestay_bookings_page",
         {"homestay_id": homestay_id},
