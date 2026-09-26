@@ -208,7 +208,7 @@ async def book(booking: BookingRequest, user_id: int = Depends(get_current_user_
             "booking_id": new_booking.id,
         }))
         await send_bot_msg(user.id, text=(f"❗️ Вы забронировани место в пункте ❗️\n"
-                                    f"{new_booking}"
+                                    f"{new_booking}\n"
                                     f"Приходите, мы Вас ждем! 😊"), keyboard=keyboard.keyboard)
     except Exception as e:
         print("ERROR:", e)

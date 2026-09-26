@@ -250,7 +250,7 @@ async def update_booking_info(update, bot):
     mid = update.get("callback", {}).get("body", {}).get("mid")
     booking = get_booking(payload.get("booking_id", -1))
     if not booking:
-        bot.edit_msg(mid, f"Такого бронирования не существует. "
+        await bot.edit_msg(mid, f"Такого бронирования не существует. "
                           f"Все бронирования автоматически удаляются через сутки, "
                           f"не подтвержденные - через 1 час.")
         return
@@ -260,9 +260,9 @@ async def update_booking_info(update, bot):
         "command": "update_booking_info",
         "booking_id": booking.id,
     }))
-    bot.edit_msg(mid,
+    await bot.edit_msg(mid,
                  text=(f"❗️ Вы забронировани место в пункте ❗️\n"
-                       f"{booking}"
+                       f"{booking}\n"
                        f"Приходите, мы Вас ждем! 😊"),
                  keyboard=keyboard
                  )
@@ -273,25 +273,25 @@ async def update_booking_info(update, bot):
     payload = safe_json_loads(update.get("callback", {}).get("payload", ""))
     mid = update.get("callback", {}).get("body", {}).get("mid")
     booking = get_booking(payload.get("booking_id", -1))
-    user = get_user(id=booking.user_id)
     if not booking:
-        bot.edit_msg(mid, f"Такого бронирования не существует. "
+        await bot.edit_msg(mid, f"Такого бронирования не существует. "
                           f"Все бронирования автоматически удаляются через сутки, "
-                          f"не подтвержденные - через 1 час.")
+                          f"не подтвержденные - через 1 час.", keyboard_to_start.keyboard)
         return
+    user = get_user(id=booking.user_id)
     booking.approved = 1
     insert_or_update_booking(booking)
-    bot.edit_msg(mid,
+    await bot.edit_msg(mid,
                  text=(f"❗️ Бронирование подтверждено ❗️\n"
                        f"Заявку оставил {user.username}\n"
                        f"Контактный номер: {user.phone_number if user.phone_number else '-'}\n"
-                       f"Управлять всеми бронями вы можете по кнопке Броинварония в главном меню\n\n"
+                       f"Управлять всеми бронями вы можете по кнопке Бронирования в главном меню\n\n"
                        f"{booking}"),
                  keyboard=keyboard_to_start
                  )
-    bot.send_msg(booking.user_id, f"❗️ Ваше бронирование подтверждено менеджером!\n"
+    await bot.send_msg(booking.user_id, f"❗️ Ваше бронирование подтверждено менеджером!\n"
                                   f"🔵 Обратите внимание, что бронь действует ближайшие сутки. \n\n"
-                                  f"{booking}")
+                                  f"{booking}", keyboard_to_start.keyboard)
 
 @bot.message_handler(func=lambda msg, tp:
 safe_json_loads(msg.get("callback", {}).get("payload", "")).get("command") == "delete_booking")
@@ -300,13 +300,13 @@ async def update_booking_info(update, bot):
     mid = update.get("callback", {}).get("body", {}).get("mid")
     booking = get_booking(payload.get("booking_id", -1))
     if not booking:
-        bot.edit_msg(mid, f"Такого бронирования не существует. "
+        await bot.edit_msg(mid, f"Такого бронирования не существует. "
                           f"Все бронирования автоматически удаляются через сутки, "
-                          f"не подтвержденные - через 1 час.")
+                          f"не подтвержденные - через 1 час.", keyboard_to_start.keyboard)
         return
     booking.approved = 1
     insert_or_update_booking(booking)
-    bot.edit_msg(mid,
+    await bot.edit_msg(mid,
                  text=(f"❌ Бронирование отменено ❌️\n"
                        f"Управлять всеми бронями вы можете по кнопке Броинварония в главном меню\n\n"
                        f"{booking}"),
@@ -319,5 +319,5 @@ async def update_booking_info(update, bot):
         phone = usr_manager.phone_number
         manager = (f"😎 Менеджер: {name if name else '-'}\n"
                    f"📱 Телефон менеджера: {phone if phone else '-'}\n")
-    bot.send_msg(booking.user_id, f"❌️ Ваше бронирование удалено менеджером!\n"
-                                  f"{manager}")
+    await bot.send_msg(booking.user_id, f"❌️ Ваше бронирование удалено менеджером!\n"
+                                  f"{manager}", keyboard_to_start.keyboard)

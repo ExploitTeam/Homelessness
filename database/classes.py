@@ -157,7 +157,7 @@ class Booking:
                        f"📱 Телефон менеджера: {phone if phone else '-'}\n")
 
         return (f"ID бронирования: {self.id}\n"
-                f"Дата: {datetime.fromisoformat(self.date_time)}"
+                f"Дата: {datetime.fromisoformat(self.date_time)}\n"
                 f"📍 Адрес пункта: {homestay.address}\n"
                 f"⚡️ Тип: {HomestayTypes(homestay.homestay_type).label}\n"
                 f"⏳ Часы работы: {homestay.open_time} - {homestay.close_time}\n"
