@@ -278,7 +278,7 @@ async def update_booking_info(update, bot):
                           f"не подтвержденные - через 1 час.", keyboard_to_start.keyboard)
         return
     user = get_user(id=booking.user_id)
-    booking.approved = 1
+    booking.is_approved = 1
     insert_or_update_booking(booking)
     await bot.edit_msg(mid,
                  text=(f"❗️ Бронирование подтверждено ❗️\n"
@@ -303,8 +303,7 @@ async def update_booking_info(update, bot):
                           f"Все бронирования автоматически удаляются через сутки, "
                           f"не подтвержденные - через 1 час."), btns=keyboard_to_start.keyboard)
         return
-    booking.approved = 1
-    insert_or_update_booking(booking)
+    delete_booking(booking)
     await bot.edit_msg(mid,
                  text=(f"❌ Бронирование отменено ❌️\n"
                        f"Управлять всеми бронями вы можете по кнопке Броинварония в главном меню\n\n"
