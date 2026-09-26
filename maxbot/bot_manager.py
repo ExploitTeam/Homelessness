@@ -263,7 +263,7 @@ async def update_booking_info(update, bot):
                  text=(f"❗️ Вы забронировани место в пункте ❗️\n"
                        f"{booking}\n"
                        f"Приходите, мы Вас ждем! 😊"),
-                 keyboard=keyboard
+                 btns=keyboard
                  )
 
 @bot.message_handler(func=lambda msg, tp:
@@ -288,9 +288,9 @@ async def update_booking_info(update, bot):
                        f"{booking}"),
                  btns=keyboard_to_start
                  )
-    await bot.send_msg(booking.user_id, f"❗️ Ваше бронирование подтверждено менеджером!\n"
+    await bot.send_msg(booking.user_id, text=(f"❗️ Ваше бронирование подтверждено менеджером!\n"
                                   f"🔵 Обратите внимание, что бронь действует ближайшие сутки. \n\n"
-                                  f"{booking}", keyboard_to_start.keyboard)
+                                  f"{booking}"), btns=keyboard_to_start.keyboard)
 
 @bot.message_handler(func=lambda msg, tp:
 safe_json_loads(msg.get("callback", {}).get("payload", "")).get("command") == "delete_booking")
@@ -299,9 +299,9 @@ async def update_booking_info(update, bot):
     mid = update.get("message", {}).get("body", {}).get("mid", "")
     booking = get_booking(payload.get("booking_id", -1))
     if not booking:
-        await bot.edit_msg(mid, f"Такого бронирования не существует. "
+        await bot.edit_msg(mid, text=(f"Такого бронирования не существует. "
                           f"Все бронирования автоматически удаляются через сутки, "
-                          f"не подтвержденные - через 1 час.", keyboard_to_start.keyboard)
+                          f"не подтвержденные - через 1 час."), btns=keyboard_to_start.keyboard)
         return
     booking.approved = 1
     insert_or_update_booking(booking)
