@@ -152,8 +152,8 @@ class Booking:
         from database.db_manager import get_homestay, get_user
         from maxbot.functions import is_point_open
 
-        homestay = get_homestay(self.homestay_id)
-        user = get_user(self.user_id)
+        homestay = get_homestay(id=self.homestay_id)
+        user = get_user(id=self.user_id)
         if not homestay or not user:
             return f"Бронирование с ID {self.id} недействительно. "
 
