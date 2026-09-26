@@ -254,7 +254,7 @@ async def update_booking_info(update, bot):
                           f"Все бронирования автоматически удаляются через сутки, "
                           f"не подтвержденные - через 1 час.", keyboard=keyboard_to_start.keyboard)
         return
-
+    booking = get_booking(booking)
     keyboard = InlineKeyboardMarkup()
     keyboard.add_button("🔄 Обновить", button_types.callback, json.dumps({
         "command": "update_booking_info",
@@ -278,6 +278,7 @@ async def update_booking_info(update, bot):
                           f"Все бронирования автоматически удаляются через сутки, "
                           f"не подтвержденные - через 1 час.", keyboard_to_start.keyboard)
         return
+    booking = get_booking(booking)
     user = get_user(id=booking.user_id)
     booking.approved = 1
     insert_or_update_booking(booking)
@@ -304,6 +305,7 @@ async def update_booking_info(update, bot):
                           f"Все бронирования автоматически удаляются через сутки, "
                           f"не подтвержденные - через 1 час.", keyboard_to_start.keyboard)
         return
+    booking = get_booking(booking)
     booking.approved = 1
     insert_or_update_booking(booking)
     await bot.edit_msg(mid,
