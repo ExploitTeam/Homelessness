@@ -494,7 +494,7 @@ def get_homestay_bookings(homestay : Homestay | None = None) -> list[Booking]:
                     user_id = row[1],
                     homestay_id = row[2],
                     date_time = row[3],
-                    is_approved = row[5],
+                    is_approved = row[4],
                 )
                 for row in rows
             ]
