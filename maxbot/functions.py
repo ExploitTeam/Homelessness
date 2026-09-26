@@ -83,7 +83,6 @@ async def do_on_start(bot, usr, msg_id = None):
         insert_or_update_user(usr)
 
     keyboard.add_button("Редактировать пользователя", button_types.callback, payload="edit_user")
-    keyboard.add_button("Мои бронирования", button_types.callback, payload="my_bookings")
     if id in ADMINS or usr.user_type in [1, 2]:
         keyboard.add_button("Редактировать пункт помощи", button_types.callback, payload="edit_homestay")
         keyboard.add_button("Управление бронированиями", button_types.callback, payload="manage_bookings")
@@ -92,7 +91,7 @@ async def do_on_start(bot, usr, msg_id = None):
         text = start_text.format(name, id)
     else:
         text = start_text.format("", id)
-
+    keyboard.add_button("Мои бронирования", button_types.callback, payload="my_bookings")
     keyboard.add_button("Отправить геопозицию", button_types.request_geo_location, payload="send_geo")
     if msg_id:
         await bot.edit_msg(msg_id, text, keyboard.keyboard)
