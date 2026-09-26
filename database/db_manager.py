@@ -374,8 +374,8 @@ def insert_or_update_booking(booking : Booking | None = None) -> bool:
                 ON CONFLICT(id) DO UPDATE SET 
                     user_id = excluded.user_id, 
                     homestay_id = excluded.homestay_id,
-                    date = excluded.date,
-                    time = excluded.time,
+                    date_time = excluded.date_time,
+                    date_time = excluded.date_time,
                     is_approved = excluded.is_approved
             """, (
                 booking.id,
