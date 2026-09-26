@@ -434,6 +434,39 @@ def get_all_homestays() -> list[Homestay]:
         ]
 
 
+
+def get_all_bookings() -> list[Booking]:
+    """Возвращает список всех броней из БД."""
+
+    with sqlite3.connect(database_name) as conn:
+        conn.execute("PRAGMA foreign_keys = ON")
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT
+                id,
+                user_id,
+                homestay_id,
+                date_time,
+                is_approved
+            FROM bookings
+        """)
+
+        rows = cursor.fetchall()
+
+        return [
+            Booking(
+                id=row[0],
+                user_id=row[1],
+                homestay_id=row[2],
+                date_time=row[3],
+                is_approved=row[4],
+            )
+            for row in rows
+        ]
+
+
+
 def get_user_bookings(user : User | None = None) -> list[Booking]:
     if user is None:
         return []
