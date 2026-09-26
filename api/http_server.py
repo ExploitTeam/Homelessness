@@ -112,9 +112,12 @@ async def info(user_id: int = Depends(get_current_user_id)):
         bookings = get_user_bookings(sender_user)
         print(f"\nSENDER USER: {sender_user}\nBookings {bookings}\n")
         if bookings:
-            res["booking"] = [i.to_json() for i in bookings if i.homestay_id == homestay.id]
+            for i in bookings:
+                if i.homestay_id == homestay.id:
+                    res["booking"] = i.to_json()
+                    break
         else:
-            res["booking"] = []
+            res["booking"] = {}
         answer.append(res)
 
     print("REQUEST ANSWER: \n", {
