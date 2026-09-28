@@ -1,24 +1,53 @@
+export type MetroStationTuple = [string, number, number];
+
 export interface MetroStation {
+  /**
+   * Уникальный id ПЛАТФОРМЫ, а не просто название станции.
+   * Например: "sokolnicheskaya::Сокольники".
+   */
   id: string;
   name: string;
+  lineId: string;
+  lineName: string;
+  lineNumber: string;
   lines: string[];
   lat: number;
   lng: number;
-  color?: string;
+  color: string;
 }
 
 export interface MetroLine {
   id: string;
+  number: string;
   name: string;
   color: string;
-  stations: [string, number, number][];
+  stations: MetroStationTuple[];
+  branches?: MetroStationTuple[][];
+  isCircle?: boolean;
+  render?: "solid" | "double";
 }
 
+export interface MetroTransferMember {
+  lineId: string;
+  station: string;
+}
+
+export interface MetroTransferGroup {
+  id: string;
+  minutes: number;
+  members: MetroTransferMember[];
+}
+
+/**
+ * Цвета максимально близки к актуальной московской навигации.
+ * Для МЦК renderer должен использовать render: "double".
+ */
 export const metroLines: MetroLine[] = [
   {
     id: "sokolnicheskaya",
+    number: "1",
     name: "Сокольническая",
-    color: "#E42313",
+    color: "#D92B2C",
     stations: [
       ["Бульвар Рокоссовского", 55.814916, 37.732227],
       ["Черкизовская", 55.802787, 37.744863],
@@ -45,14 +74,16 @@ export const metroLines: MetroLine[] = [
       ["Филатов Луг", 55.5997, 37.4075],
       ["Прокшино", 55.5813, 37.4425],
       ["Ольховая", 55.5692, 37.4589],
-      ["Коммунарка", 55.559765, 37.468716],
+      ["Новомосковская", 55.560556, 37.465278],
+      ["Потапово", 55.553056, 37.493056],
     ],
   },
 
   {
     id: "zamoskvoretskaya",
+    number: "2",
     name: "Замоскворецкая",
-    color: "#4FB04F",
+    color: "#4DBE52",
     stations: [
       ["Ховрино", 55.8777, 37.4877],
       ["Беломорская", 55.8651, 37.4764],
@@ -83,6 +114,7 @@ export const metroLines: MetroLine[] = [
 
   {
     id: "arbatsko-pokrovskaya",
+    number: "3",
     name: "Арбатско-Покровская",
     color: "#0072BA",
     stations: [
@@ -113,6 +145,7 @@ export const metroLines: MetroLine[] = [
 
   {
     id: "filevskaya",
+    number: "4",
     name: "Филёвская",
     color: "#1EBCEF",
     stations: [
@@ -128,10 +161,41 @@ export const metroLines: MetroLine[] = [
       ["Арбатская", 55.752312, 37.60349],
       ["Александровский сад", 55.752123, 37.610388],
     ],
+    branches: [
+      [
+        ["Киевская", 55.743168, 37.565425],
+        ["Деловой центр", 55.7491, 37.5395],
+        ["Москва-Сити", 55.7472, 37.5322],
+      ],
+    ],
+  },
+
+  {
+    id: "koltsevaya",
+    number: "5",
+    name: "Кольцевая",
+    color: "#915133",
+    isCircle: true,
+    stations: [
+      ["Парк культуры", 55.736163, 37.595027],
+      ["Киевская", 55.743117, 37.564132],
+      ["Краснопресненская", 55.7603, 37.577],
+      ["Белорусская", 55.777439, 37.582107],
+      ["Новослободская", 55.7799, 37.6015],
+      ["Проспект Мира", 55.781827, 37.633199],
+      ["Комсомольская", 55.774072, 37.654565],
+      ["Курская", 55.758564, 37.659039],
+      ["Таганская", 55.739502, 37.653605],
+      ["Павелецкая", 55.729741, 37.638693],
+      ["Добрынинская", 55.7289, 37.6223],
+      ["Октябрьская", 55.731232, 37.612851],
+      ["Парк культуры", 55.736163, 37.595027],
+    ],
   },
 
   {
     id: "kaluzhsko-rizhskaya",
+    number: "6",
     name: "Калужско-Рижская",
     color: "#F07E24",
     stations: [
@@ -164,6 +228,7 @@ export const metroLines: MetroLine[] = [
 
   {
     id: "tagansko-krasnopresnenskaya",
+    number: "7",
     name: "Таганско-Краснопресненская",
     color: "#943E90",
     stations: [
@@ -195,6 +260,7 @@ export const metroLines: MetroLine[] = [
 
   {
     id: "kalininskaya",
+    number: "8",
     name: "Калининская",
     color: "#FFCD1C",
     stations: [
@@ -210,7 +276,31 @@ export const metroLines: MetroLine[] = [
   },
 
   {
+    id: "solntsevskaya",
+    number: "8A",
+    name: "Солнцевская",
+    color: "#FFD21E",
+    stations: [
+      ["Деловой центр", 55.7491, 37.5395],
+      ["Парк Победы", 55.735679, 37.516865],
+      ["Минская", 55.7238, 37.4962],
+      ["Ломоносовский проспект", 55.7069, 37.5168],
+      ["Раменки", 55.6978, 37.4987],
+      ["Мичуринский проспект", 55.6997, 37.4825],
+      ["Озёрная", 55.6703, 37.4494],
+      ["Говорово", 55.661, 37.4175],
+      ["Солнцево", 55.649, 37.391],
+      ["Боровское шоссе", 55.647, 37.37],
+      ["Новопеределкино", 55.656, 37.353],
+      ["Рассказовка", 55.632, 37.333],
+      ["Пыхтино", 55.622, 37.298],
+      ["Аэропорт Внуково", 55.636, 37.287],
+    ],
+  },
+
+  {
     id: "serpukhovsko-timiryazevskaya",
+    number: "9",
     name: "Серпуховско-Тимирязевская",
     color: "#ADACAC",
     stations: [
@@ -244,8 +334,9 @@ export const metroLines: MetroLine[] = [
 
   {
     id: "lyublinsko-dmitrovskaya",
+    number: "10",
     name: "Люблинско-Дмитровская",
-    color: "#BED12C",
+    color: "#A8D92D",
     stations: [
       ["Физтех", 55.9278, 37.5147],
       ["Лианозово", 55.8972, 37.5674],
@@ -276,66 +367,12 @@ export const metroLines: MetroLine[] = [
     ],
   },
 
-  // =========================
-  // КОЛЬЦЕВАЯ
-  // =========================
-
-  {
-    id: "koltsevaya",
-    name: "Кольцевая",
-    color: "#915133",
-    stations: [
-      ["Парк культуры", 55.736163, 37.595027],
-      ["Киевская", 55.743117, 37.564132],
-      ["Краснопресненская", 55.7603, 37.577],
-      ["Белорусская", 55.777439, 37.582107],
-      ["Новослободская", 55.7799, 37.6015],
-      ["Проспект Мира", 55.781827, 37.633199],
-      ["Комсомольская", 55.774072, 37.654565],
-      ["Курская", 55.758564, 37.659039],
-      ["Таганская", 55.739502, 37.653605],
-      ["Павелецкая", 55.729741, 37.638693],
-      ["Добрынинская", 55.7289, 37.6223],
-      ["Октябрьская", 55.731232, 37.612851],
-
-      // замыкание кольца
-      ["Парк культуры", 55.736163, 37.595027],
-    ],
-  },
-
-  // =========================
-  // СОЛНЦЕВСКАЯ
-  // =========================
-
-  {
-    id: "solntsevskaya",
-    name: "Солнцевская",
-    color: "#FFD21E",
-    stations: [
-      ["Парк Победы", 55.735679, 37.516865],
-      ["Минская", 55.7238, 37.4962],
-      ["Ломоносовский проспект", 55.7069, 37.5168],
-      ["Раменки", 55.6978, 37.4987],
-      ["Мичуринский проспект", 55.6997, 37.4825],
-      ["Озёрная", 55.6703, 37.4494],
-      ["Говорово", 55.661, 37.4175],
-      ["Солнцево", 55.649, 37.391],
-      ["Боровское шоссе", 55.647, 37.37],
-      ["Новопеределкино", 55.656, 37.353],
-      ["Рассказовка", 55.632, 37.333],
-      ["Пыхтино", 55.622, 37.298],
-      ["Аэропорт Внуково", 55.636, 37.287],
-    ],
-  },
-
-  // =========================
-  // БОЛЬШАЯ КОЛЬЦЕВАЯ
-  // =========================
-
   {
     id: "bolshaya-koltsevaya",
+    number: "11",
     name: "Большая кольцевая",
-    color: "#E78AC3",
+    color: "#79CDCD",
+    isCircle: true,
     stations: [
       ["Савёловская", 55.793333, 37.586944],
       ["Петровский парк", 55.791944, 37.5575],
@@ -366,20 +403,15 @@ export const metroLines: MetroLine[] = [
       ["Сокольники", 55.789282, 37.679895],
       ["Рижская", 55.793611, 37.635833],
       ["Марьина Роща", 55.798333, 37.617222],
-
-      // замыкание БКЛ
       ["Савёловская", 55.793333, 37.586944],
     ],
   },
 
-  // =========================
-  // БУТОВСКАЯ
-  // =========================
-
   {
     id: "butovskaya",
+    number: "12",
     name: "Бутовская",
-    color: "#A1A2A3",
+    color: "#A1B3D4",
     stations: [
       ["Битцевский парк", 55.6003, 37.5561],
       ["Лесопарковая", 55.5824, 37.5775],
@@ -391,100 +423,89 @@ export const metroLines: MetroLine[] = [
     ],
   },
 
-  // =========================
-  // МЦК
-  // =========================
-
   {
     id: "mkc",
+    number: "14",
     name: "Московское центральное кольцо",
-    color: "#D32F92",
+    color: "#DE0914",
+    isCircle: true,
+    render: "double",
     stations: [
-      ["Коптево", 55.839, 37.521],
-      ["Лихоборы", 55.847, 37.553],
-      ["Окружная", 55.8484, 37.588],
-      ["Владыкино", 55.848236, 37.590451],
-      ["Ботанический сад", 55.844597, 37.637811],
-      ["Ростокино", 55.841, 37.666],
-      ["Белокаменная", 55.832, 37.702],
-      ["Локомотив", 55.803, 37.745],
-      ["Бульвар Рокоссовского", 55.814916, 37.732227],
-      ["Измайлово", 55.788, 37.742],
-      ["Соколиная Гора", 55.776, 37.747],
-      ["Шоссе Энтузиастов", 55.75809, 37.751703],
-      ["Андроновка", 55.747, 37.733],
-      ["Нижегородская", 55.7325, 37.728056],
-      ["Новохохловская", 55.725, 37.717],
-      ["Угрешская", 55.719, 37.697],
-      ["Дубровка", 55.7182, 37.676],
-      ["Автозаводская", 55.706634, 37.657008],
-      ["ЗИЛ", 55.698, 37.648],
-      ["Верхние Котлы", 55.69, 37.618],
+      ["Коптево", 55.8397, 37.5203],
+      ["Лихоборы", 55.8472, 37.5513],
+      ["Окружная", 55.8472, 37.5694],
+      ["Владыкино", 55.8476, 37.593],
+      ["Ботанический сад", 55.846, 37.6413],
+      ["Ростокино", 55.84, 37.6653],
+      ["Белокаменная", 55.83, 37.7006],
+      ["Локомотив", 55.8039, 37.746],
+      ["Бульвар Рокоссовского", 55.8172, 37.7369],
+      ["Измайлово", 55.7886, 37.7428],
+      ["Соколиная Гора", 55.7714, 37.7451],
+      ["Шоссе Энтузиастов", 55.759, 37.7463],
+      ["Андроновка", 55.7411, 37.7344],
+      ["Нижегородская", 55.7322, 37.7282],
+      ["Новохохловская", 55.7239, 37.7161],
+      ["Угрешская", 55.7183, 37.6978],
+      ["Дубровка", 55.7127, 37.6781],
+      ["Автозаводская", 55.7063, 37.6631],
+      ["ЗИЛ", 55.6983, 37.6483],
+      ["Верхние Котлы", 55.69, 37.6189],
       ["Крымская", 55.69, 37.605],
-      ["Площадь Гагарина", 55.706, 37.585],
-      ["Лужники", 55.72, 37.563],
-      ["Кутузовская", 55.740544, 37.5341],
-      ["Москва-Сити", 55.747, 37.533],
-      ["Шелепиха", 55.756667, 37.525],
-      ["Хорошёво", 55.777, 37.506],
-      ["Зорге", 55.787, 37.505],
-      ["Панфиловская", 55.796, 37.498],
-      ["Стрешнево", 55.813, 37.486],
-      ["Балтийская", 55.825, 37.496],
-
-      // замыкание МЦК
-      ["Коптево", 55.839, 37.521],
+      ["Площадь Гагарина", 55.7069, 37.5858],
+      ["Лужники", 55.7203, 37.5631],
+      ["Кутузовская", 55.7408, 37.5333],
+      ["Москва-Сити", 55.7472, 37.5322],
+      ["Шелепиха", 55.7575, 37.5256],
+      ["Хорошёво", 55.7772, 37.5072],
+      ["Зорге", 55.7878, 37.5045],
+      ["Панфиловская", 55.7991, 37.4988],
+      ["Стрешнево", 55.8136, 37.4869],
+      ["Балтийская", 55.8258, 37.4961],
+      ["Коптево", 55.8397, 37.5203],
     ],
   },
-
-  // =========================
-  // НЕКРАСОВСКАЯ
-  // =========================
 
   {
     id: "nekrasovskaya",
+    number: "15",
     name: "Некрасовская",
-    color: "#E875B1",
+    color: "#DE64A1",
     stations: [
-      ["Некрасовка", 55.702, 37.927],
-      ["Лухмановская", 55.707, 37.901],
-      ["Улица Дмитриевского", 55.713, 37.879],
-      ["Косино", 55.718, 37.852],
-      ["Стахановская", 55.727, 37.768],
-      ["Окская", 55.718, 37.793],
-      ["Нижегородская", 55.7325, 37.728056],
+      ["Нижегородская", 55.731748, 37.730076],
+      ["Стахановская", 55.725, 37.7619],
+      ["Окская", 55.7186, 37.7817],
+      ["Юго-Восточная", 55.70497, 37.81901],
+      ["Косино", 55.7033, 37.8511],
+      ["Улица Дмитриевского", 55.71, 37.8792],
+      ["Лухмановская", 55.7085, 37.9004],
+      ["Некрасовка", 55.7036, 37.9264],
     ],
   },
 
-  // =========================
-  // ТРОИЦКАЯ
-  // =========================
-
   {
     id: "troitskaya",
+    number: "16",
     name: "Троицкая",
-    color: "#1FA774",
+    color: "#03795F",
     stations: [
       ["ЗИЛ", 55.698, 37.648],
       ["Крымская", 55.69, 37.605],
       ["Академическая", 55.687147, 37.5723],
       ["Вавиловская", 55.696, 37.55],
       ["Новаторская", 55.670556, 37.506944],
-      ["Университет Дружбы Народов", 55.655, 37.492],
-      ["Генерала Тюленева", 55.642, 37.472],
-      ["Тютчевская", 55.631, 37.461],
-      ["Славянский мир", 55.612, 37.441],
-      ["Мамыри", 55.595, 37.468],
-      ["Коммунарка", 55.559765, 37.468716],
+      ["Университет Дружбы Народов", 55.648056, 37.507222],
+      ["Генерала Тюленева", 55.626111, 37.486111],
+      ["Тютчевская", 55.618889, 37.481111],
+      ["Корниловская", 55.598373, 37.480581],
+      ["Коммунарка", 55.574444, 37.467778],
+      ["Новомосковская", 55.560556, 37.465278],
     ],
   },
 
-  // =========================
-  // РУБЛЁВО-АРХАНГЕЛЬСКАЯ
-  // =========================
-
   {
     id: "rublyovo-arhangelskaya",
+    number: "17",
     name: "Рублёво-Архангельская",
     color: "#5B5B5B",
     stations: [
@@ -495,33 +516,302 @@ export const metroLines: MetroLine[] = [
       ["Бульвар Генерала Карбышева", 55.764, 37.454],
     ],
   },
+
 ];
 
+/**
+ * Одноимённые станции обычно являются пересадками, но эти две пары
+ * в Москве географически разные и НЕ имеют прямого перехода.
+ */
+export const sameNameTransferExclusions = new Set<string>([
+  "Арбатская",
+  "Смоленская",
+]);
+
+/**
+ * Пересадки между станциями с разными названиями.
+ * Одноимённые пересадки строятся автоматически в metro.ts.
+ */
+export const metroTransferGroups: MetroTransferGroup[] = [
+  {
+    id: "chistye-prudy",
+    minutes: 3,
+    members: [
+      { lineId: "sokolnicheskaya", station: "Чистые пруды" },
+      { lineId: "kaluzhsko-rizhskaya", station: "Тургеневская" },
+      { lineId: "lyublinsko-dmitrovskaya", station: "Сретенский бульвар" },
+    ],
+  },
+  {
+    id: "lubyanka",
+    minutes: 3,
+    members: [
+      { lineId: "sokolnicheskaya", station: "Лубянка" },
+      { lineId: "tagansko-krasnopresnenskaya", station: "Кузнецкий Мост" },
+    ],
+  },
+  {
+    id: "okhotny-ryad",
+    minutes: 3,
+    members: [
+      { lineId: "sokolnicheskaya", station: "Охотный Ряд" },
+      { lineId: "zamoskvoretskaya", station: "Театральная" },
+      { lineId: "arbatsko-pokrovskaya", station: "Площадь Революции" },
+    ],
+  },
+  {
+    id: "biblioteka",
+    minutes: 4,
+    members: [
+      { lineId: "sokolnicheskaya", station: "Библиотека имени Ленина" },
+      { lineId: "filevskaya", station: "Александровский сад" },
+      { lineId: "arbatsko-pokrovskaya", station: "Арбатская" },
+      { lineId: "serpukhovsko-timiryazevskaya", station: "Боровицкая" },
+    ],
+  },
+  {
+    id: "dinamo",
+    minutes: 4.5,
+    members: [
+      { lineId: "zamoskvoretskaya", station: "Динамо" },
+      { lineId: "bolshaya-koltsevaya", station: "Петровский парк" },
+    ],
+  },
+  {
+    id: "pushkinskaya",
+    minutes: 3,
+    members: [
+      { lineId: "zamoskvoretskaya", station: "Тверская" },
+      { lineId: "tagansko-krasnopresnenskaya", station: "Пушкинская" },
+      { lineId: "serpukhovsko-timiryazevskaya", station: "Чеховская" },
+    ],
+  },
+  {
+    id: "tretyakovskaya",
+    minutes: 3,
+    members: [
+      { lineId: "zamoskvoretskaya", station: "Новокузнецкая" },
+      { lineId: "kaluzhsko-rizhskaya", station: "Третьяковская" },
+      { lineId: "kalininskaya", station: "Третьяковская" },
+    ],
+  },
+  {
+    id: "kurskaya",
+    minutes: 3,
+    members: [
+      { lineId: "arbatsko-pokrovskaya", station: "Курская" },
+      { lineId: "koltsevaya", station: "Курская" },
+      { lineId: "lyublinsko-dmitrovskaya", station: "Чкаловская" },
+    ],
+  },
+  {
+    id: "barrikadnaya",
+    minutes: 3,
+    members: [
+      { lineId: "tagansko-krasnopresnenskaya", station: "Баррикадная" },
+      { lineId: "koltsevaya", station: "Краснопресненская" },
+    ],
+  },
+  {
+    id: "taganskaya",
+    minutes: 3,
+    members: [
+      { lineId: "tagansko-krasnopresnenskaya", station: "Таганская" },
+      { lineId: "koltsevaya", station: "Таганская" },
+      { lineId: "kalininskaya", station: "Марксистская" },
+    ],
+  },
+  {
+    id: "proletarskaya",
+    minutes: 3,
+    members: [
+      { lineId: "tagansko-krasnopresnenskaya", station: "Пролетарская" },
+      { lineId: "lyublinsko-dmitrovskaya", station: "Крестьянская застава" },
+    ],
+  },
+  {
+    id: "ploshchad-ilicha",
+    minutes: 3,
+    members: [
+      { lineId: "kalininskaya", station: "Площадь Ильича" },
+      { lineId: "lyublinsko-dmitrovskaya", station: "Римская" },
+    ],
+  },
+  {
+    id: "novoslobodskaya",
+    minutes: 3,
+    members: [
+      { lineId: "serpukhovsko-timiryazevskaya", station: "Менделеевская" },
+      { lineId: "koltsevaya", station: "Новослободская" },
+    ],
+  },
+  {
+    id: "tsvetnoy",
+    minutes: 3,
+    members: [
+      { lineId: "serpukhovsko-timiryazevskaya", station: "Цветной бульвар" },
+      { lineId: "lyublinsko-dmitrovskaya", station: "Трубная" },
+    ],
+  },
+  {
+    id: "dobryninskaya",
+    minutes: 3,
+    members: [
+      { lineId: "serpukhovsko-timiryazevskaya", station: "Серпуховская" },
+      { lineId: "koltsevaya", station: "Добрынинская" },
+    ],
+  },
+  {
+    id: "kakhovskaya",
+    minutes: 3,
+    members: [
+      { lineId: "serpukhovsko-timiryazevskaya", station: "Севастопольская" },
+      { lineId: "bolshaya-koltsevaya", station: "Каховская" },
+    ],
+  },
+  {
+    id: "dmitriya-donskogo",
+    minutes: 3,
+    members: [
+      { lineId: "serpukhovsko-timiryazevskaya", station: "Бульвар Дмитрия Донского" },
+      { lineId: "butovskaya", station: "Улица Старокачаловская" },
+    ],
+  },
+  {
+    id: "zyablikovo",
+    minutes: 3,
+    members: [
+      { lineId: "lyublinsko-dmitrovskaya", station: "Зябликово" },
+      { lineId: "zamoskvoretskaya", station: "Красногвардейская" },
+    ],
+  },
+  {
+    id: "bitsevsky",
+    minutes: 3,
+    members: [
+      { lineId: "butovskaya", station: "Битцевский парк" },
+      { lineId: "kaluzhsko-rizhskaya", station: "Новоясеневская" },
+    ],
+  },
+  {
+    id: "lokomotiv",
+    minutes: 5,
+    members: [
+      { lineId: "mkc", station: "Локомотив" },
+      { lineId: "sokolnicheskaya", station: "Черкизовская" },
+    ],
+  },
+  {
+    id: "gagarina",
+    minutes: 5,
+    members: [
+      { lineId: "mkc", station: "Площадь Гагарина" },
+      { lineId: "kaluzhsko-rizhskaya", station: "Ленинский проспект" },
+    ],
+  },
+  {
+    id: "luzhniki",
+    minutes: 5,
+    members: [
+      { lineId: "mkc", station: "Лужники" },
+      { lineId: "sokolnicheskaya", station: "Спортивная" },
+    ],
+  },
+  {
+    id: "kosino",
+    minutes: 4,
+    members: [
+      { lineId: "nekrasovskaya", station: "Косино" },
+      { lineId: "tagansko-krasnopresnenskaya", station: "Лермонтовский проспект" },
+    ],
+  },
+  {
+    id: "horoshevskaya",
+    minutes: 3,
+    members: [
+      { lineId: "bolshaya-koltsevaya", station: "Хорошёвская" },
+      { lineId: "tagansko-krasnopresnenskaya", station: "Полежаевская" },
+    ],
+  },
+  {
+    id: "vorontsovskaya",
+    minutes: 3,
+    members: [
+      { lineId: "bolshaya-koltsevaya", station: "Воронцовская" },
+      { lineId: "kaluzhsko-rizhskaya", station: "Калужская" },
+    ],
+  },
+];
+
+export function stationNodeId(
+  lineId: string,
+  stationName: string
+): string {
+  return `${lineId}::${stationName}`;
+}
+
+export function getMetroLinePaths(
+  line: MetroLine
+): MetroStationTuple[][] {
+  return [line.stations, ...(line.branches ?? [])];
+}
+
+/**
+ * Важно: здесь больше НЕТ Map<name, station>.
+ * Каждая платформа хранится отдельно, поэтому одинаковое название
+ * на разных линиях не уничтожает реальные координаты второй линии.
+ */
 export const metroStations: MetroStation[] = (() => {
   const stations = new Map<string, MetroStation>();
 
   for (const line of metroLines) {
-    for (const [name, lat, lng] of line.stations) {
-      const existing = stations.get(name);
+    for (const path of getMetroLinePaths(line)) {
+      for (const [name, lat, lng] of path) {
+        const id = stationNodeId(line.id, name);
 
-      if (existing) {
-        if (!existing.lines.includes(line.name)) {
-          existing.lines.push(line.name);
+        if (stations.has(id)) {
+          continue;
         }
 
-        continue;
+        stations.set(id, {
+          id,
+          name,
+          lineId: line.id,
+          lineName: line.name,
+          lineNumber: line.number,
+          lines: [line.name],
+          lat,
+          lng,
+          color: line.color,
+        });
       }
-
-      stations.set(name, {
-        id: name,
-        name,
-        lat,
-        lng,
-        lines: [line.name],
-        color: line.color,
-      });
     }
   }
 
   return Array.from(stations.values());
 })();
+
+export const metroLineById = new Map(
+  metroLines.map((line) => [line.id, line] as const)
+);
+
+export const metroStationById = new Map(
+  metroStations.map((station) => [station.id, station] as const)
+);
+
+export function getStationPlatforms(
+  stationName: string
+): MetroStation[] {
+  return metroStations.filter(
+    (station) => station.name === stationName
+  );
+}
+
+export function getLineStation(
+  lineId: string,
+  stationName: string
+): MetroStation | undefined {
+  return metroStationById.get(
+    stationNodeId(lineId, stationName)
+  );
+}
