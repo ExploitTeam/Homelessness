@@ -100,7 +100,9 @@ function App() {
         );
 
         setBookingMessage(
-          "Не удалось забронировать место"
+          error instanceof Error
+            ? error.message
+            : "Не удалось забронировать место"
         );
 
         setTimeout(() => {

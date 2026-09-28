@@ -44,6 +44,23 @@ async function authorize(): Promise<string> {
   return accessToken;
 }
 
+export interface ManagerInfo {
+  id: number;
+  username: string;
+  user_type: number;
+  phone_number: string;
+  id_homestay: number;
+  last_booking: string;
+}
+
+export interface BookingInfo {
+  id: number;
+  user_id: number;
+  homestay_id: number;
+  date_time: string;
+  is_approved: number;
+}
+
 export interface BackendPlace {
   id: number;
   address: string;
@@ -55,9 +72,17 @@ export interface BackendPlace {
   additional_info: string | null;
   homestay_type: number;
 
-  // ИМЕННО названия из твоей БД
+  // именно названия из БД
   longtitude: number | null;
   latitude: number | null;
+
+  manager_info:
+    | ManagerInfo
+    | Record<string, never>;
+
+  booking:
+    | BookingInfo
+    | Record<string, never>;
 }
 
 interface PlacesResponse {
@@ -114,10 +139,42 @@ export async function bookHostel(
   });
 
   if (!response.ok) {
-    const text = await response.text();
+    let serverMessage = "";
+
+    try {
+      const data = await response.json();
+
+      if (typeof data?.message === "string") {
+        serverMessage = data.message;
+      }
+    } catch {
+      // Сервер мог вернуть не JSON
+    }
+
+    if (response.status === 404) {
+      throw new Error(
+        serverMessage ||
+          "Пункт или пользователь не найден"
+      );
+    }
+
+    if (response.status === 400) {
+      throw new Error(
+        serverMessage ||
+          "Нет доступных мест в данном пункте"
+      );
+    }
+
+    if (response.status === 429) {
+      throw new Error(
+        serverMessage ||
+          "Повторное бронирование возможно только через 5 минут"
+      );
+    }
 
     throw new Error(
-      `Ошибка бронирования: ${response.status} ${text}`
+      serverMessage ||
+        `Ошибка бронирования: ${response.status}`
     );
   }
 
