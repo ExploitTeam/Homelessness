@@ -234,7 +234,7 @@ async def update_geo_info(user_id: int, homestay_id: int, bot, update):
     ))
 
     await bot.send_msg(user_id, f"🏠 Иногда пункты на карте отображаются неправильно - мы работаем над этим!\n"
-                                f"🌍 Ниже вы можете ввести координаты места в формате <долгота>, <широта>.\n\n"
+                                f"🌍 Ниже вы можете ввести координаты места в формате <широта>, <долгота>.\n\n"
                                 f"❗️ Координаты можете узнать на любой удобной вам карте (Яндекс, 2Гис и тд).",
                  keyboard.keyboard)
     bot.set_next_step(user_id, json.dumps({
@@ -394,10 +394,10 @@ async def input_new_description(update, bot):
         }
     ))
     try:
-        longitude, latitude = map(float, text.split(","))
+        latitude, longitude  = map(float, text.split(","))
     except Exception as e:
         await bot.send_msg(sender_id, (f"Неудалось распознать координаты. \n"
-                                      f"Пожалуйста, введите их в формате <долгота>, <широта>"),
+                                      f"Пожалуйста, введите их в формате <широта>, <долгота>"),
                            keyboard.keyboard)
         return
     if not await require_homestay_access(update, bot, homestay_id):
@@ -406,7 +406,7 @@ async def input_new_description(update, bot):
 
     homestay = db_manager.get_homestay(id=homestay_id)
     if homestay:
-        homestay.longitude = longitude
+        homestay.longtitude = longitude
         homestay.latitude = latitude
         db_manager.insert_or_update_homestay(homestay)
         bot.clear_next_step(sender_id)
