@@ -26,7 +26,6 @@ async def edit_user_button_pressed(update, bot):
             id,
             no_edit=False
         )
-        keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
         await bot.edit_msg(
             res.get('message', {}).get('body', {}).get('mid'),
             f"Информация о пользователе:\n{usr}",
@@ -71,7 +70,6 @@ async def set_user_for_edit(update, bot):
         id,
         no_edit=False
     )
-    keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
     await bot.edit_msg(res.get('message', {}).get('body', {}).get('mid'),
                        f"Информация о пользователе:\n{usr}",
                        keyboard.keyboard)
@@ -120,7 +118,6 @@ async def set_manager(update, bot):
         insert_or_update_user(usr)
 
     keyboard = generate_buttons_by_user_privilege(usr, msg_id, sender_id)
-    keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
     await bot.edit_msg(msg_id, f"Информация о пользователе:\n{usr}", keyboard.keyboard)
 
 
@@ -182,7 +179,6 @@ async def input_point_to_attach(update, bot):
     insert_or_update_user(usr)
     res = await bot.send_msg(sender_id, f".")
     keyboard = generate_buttons_by_user_privilege(usr, res.get('message', {}).get('body', {}).get('mid'), sender_id)
-    keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
     await bot.edit_msg(res.get('message', {}).get('body', {}).get('mid'),
                        f"Даныые пользователя успешно обновлены!\n{usr}",
                        keyboard.keyboard)
@@ -229,7 +225,6 @@ async def input_new_number(update, bot):
     insert_or_update_user(usr)
     res = await bot.send_msg(sender_id, f".")
     keyboard = generate_buttons_by_user_privilege(usr, res.get('message', {}).get('body', {}).get('mid'), sender_id)
-    keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
     await bot.edit_msg(res.get('message', {}).get('body', {}).get('mid'),
                        f"Даныые пользователя успешно обновлены!\n{usr}",
                        keyboard.keyboard)

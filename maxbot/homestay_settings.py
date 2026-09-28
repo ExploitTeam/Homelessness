@@ -4,14 +4,16 @@ from maxbot.bot_manager import bot, keyboard_to_start
 from database.db_manager import *
 from maxbot.functions import *
 from maxbot.maxapi import Bot
+import dotenv
 from parser.parser import proceed_parsing
 import parser.coordinates_finder as coordinates_finder
 from database import db_manager, classes
 
+dotenv.load_dotenv()
 USER_TYPE_USER = 0
 USER_TYPE_MANAGER = 1
 USER_TYPE_ADMIN = 2
-
+ADMINS = [int(i) for i in os.getenv("MAX_ADMINS_ID", "").split(",")]
 ADMIN_ONLY_COMMANDS = {"add_homestay"}
 
 
@@ -28,7 +30,7 @@ def get_actor(user_id: int):
 
 
 def is_admin(actor) -> bool:
-    return bool(actor) and actor.user_type == USER_TYPE_ADMIN
+    return bool(actor) and (actor.user_type == USER_TYPE_ADMIN or actor.id in ADMINS)
 
 
 def is_manager(actor) -> bool:

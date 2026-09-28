@@ -21,6 +21,7 @@ keyboard_to_start.add_button("На главную", button_types.callback, paylo
 
 from maxbot.user_settings import *
 from maxbot.homestay_settings import *
+from maxbot.bookings_settings import *
 
 
 GEO_RESULTS_STEP = "geo_results"
@@ -82,6 +83,7 @@ def _build_geo_results_text(homestays: list, selected_types: list, page: int, pa
 
 def _geo_filter_keyboard(selected_types: list, page: int = 1, pages: int = 1, total: int = 0) -> InlineKeyboardMarkup:
     keyboard = InlineKeyboardMarkup()
+    keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
     if total > HOMESTAYS_PER_PAGE:
         pager = InlineKeyboardMarkup()
         pager.add_button(
@@ -112,7 +114,6 @@ def _geo_filter_keyboard(selected_types: list, page: int = 1, pages: int = 1, to
                 "type": t.value,
             })
         )
-    keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
     return keyboard
 
 

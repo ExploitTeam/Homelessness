@@ -11,9 +11,10 @@ load_dotenv()
 ADMINS = [int(i) for i in os.getenv("MAX_ADMINS_ID", "").split(",")]
 
 start_text = ("Привет{} 👋\n"
-              "Это бот, который поможет вам найти место, где можно согреться или переночевать.\n"
-              "Нажмите кнопку «Отправить геопозицию», чтобы посмотреть ближайшие к вам ночлежки.\n"
-              "Вы можете открыть мини-пиложение и ознакомиться с пунктами на карте.\n\n"
+              "Это бот, который поможет вам найти место, где можно согреться или переночевать.\n\n"
+              "Нажмите кнопку «Отправить геопозицию», чтобы посмотреть ближайшие к вам ночлежки. "
+              "Обратите внимание, что отправка геопозиции может не работать в WEB-версии Макс. 🌍 \n\n"
+              "Вы можете открыть мини-приложение и ознакомиться с пунктами на карте. 😊\n\n"
               "Ваш ID: {}.")
 
 def show_all(name=None, get_in_dict=False):
@@ -37,6 +38,7 @@ def show_all(name=None, get_in_dict=False):
 
 def generate_buttons_by_user_privilege(usr, msg_id, me, no_edit=False):
     keyboard = InlineKeyboardMarkup()
+    keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
     keyboard.add_button("Изменить номер", button_types.callback, payload=json.dumps({
         "command": "change_number",
         "user": usr.id,
@@ -85,12 +87,13 @@ async def do_on_start(bot, usr, msg_id = None):
     keyboard.add_button("Редактировать пользователя", button_types.callback, payload="edit_user")
     if id in ADMINS or usr.user_type in [1, 2]:
         keyboard.add_button("Редактировать пункт помощи", button_types.callback, payload="edit_homestay")
+        keyboard.add_button("Управление бронированиями", button_types.callback, payload="manage_bookings")
     if name:
         name = f", {name}"
         text = start_text.format(name, id)
     else:
         text = start_text.format("", id)
-
+    keyboard.add_button("Мои бронирования", button_types.callback, payload="my_bookings")
     keyboard.add_button("Отправить геопозицию", button_types.request_geo_location, payload="send_geo")
     if msg_id:
         await bot.edit_msg(msg_id, text, keyboard.keyboard)
