@@ -1,13 +1,8 @@
-import warnings
-
 from database.classes import Homestay, User, Booking
 from database.info import info
 import sqlite3
 from os import getenv
 from dotenv import load_dotenv
-import json
-from urllib.parse import urlencode
-from urllib.request import urlopen
 
 load_dotenv()
 database_name = f"{getenv('DB_NAME', 'default')}.db"
@@ -606,14 +601,59 @@ def delete_booking(booking: Booking | None = None) -> bool:
     except sqlite3.Error:
         return False
 
+#
+# def     calculate_route_distance(
+#     lat1,
+#     lon1,
+#     lat2,
+#     lon2,
+#     api_key,
+#     profile="car"
+# ):
+#     """
+#     Возвращает расстояние по маршруту между двумя координатами.
+#
+#     :param lat1: широта начальной точки
+#     :param lon1: долгота начальной точки
+#     :param lat2: широта конечной точки
+#     :param lon2: долгота конечной точки
+#     :param api_key: API-ключ GraphHopper
+#     :param profile: тип маршрута (car, bike, foot и т.д.)
+#     :return: расстояние в километрах
+#     """
+#
+#     params = [
+#         ("point", f"{lat1},{lon1}"),
+#         ("point", f"{lat2},{lon2}"),
+#         ("profile", profile),
+#         ("calc_points", "false"),
+#         ("key", api_key),
+#     ]
+#
+#     url = "https://graphhopper.com/api/1/route?" + urlencode(params)
+#
+#     try:
+#         with urlopen(url, timeout=10) as response:
+#             data = json.load(response)
+#
+#     except Exception as e:
+#         raise RuntimeError(f"Ошибка при запросе к GraphHopper: {e}")
+#
+#     try:
+#         # GraphHopper возвращает distance в метрах
+#         distance_meters = data["paths"][0]["distance"]
+#     except (KeyError, IndexError):
+#         raise RuntimeError(f"GraphHopper вернул неожиданный ответ: {data}")
+#
+#     return distance_meters / 1000
+
+
 
 def calculate_route_distance(
     lat1,
     lon1,
     lat2,
-    lon2,
-    api_key,
-    profile="car"
+    lon2
 ):
     """
     Возвращает расстояние по маршруту между двумя координатами.
@@ -622,44 +662,23 @@ def calculate_route_distance(
     :param lon1: долгота начальной точки
     :param lat2: широта конечной точки
     :param lon2: долгота конечной точки
-    :param api_key: API-ключ GraphHopper
-    :param profile: тип маршрута (car, bike, foot и т.д.)
-    :return: расстояние в километрах
+    :return: расстояние по прямой
     """
-
-    params = [
-        ("point", f"{lat1},{lon1}"),
-        ("point", f"{lat2},{lon2}"),
-        ("profile", profile),
-        ("calc_points", "false"),
-        ("key", api_key),
-    ]
-
-    url = "https://graphhopper.com/api/1/route?" + urlencode(params)
-
-    try:
-        with urlopen(url, timeout=10) as response:
-            data = json.load(response)
-
-    except Exception as e:
-        raise RuntimeError(f"Ошибка при запросе к GraphHopper: {e}")
-
-    try:
-        # GraphHopper возвращает distance в метрах
-        distance_meters = data["paths"][0]["distance"]
-    except (KeyError, IndexError):
-        raise RuntimeError(f"GraphHopper вернул неожиданный ответ: {data}")
-
-    return distance_meters / 1000
+    import math
+    return math.sqrt((lat2 - lat1)**2 + (lon2 - lon1)**2)
 
 
 def sort_homestays_by_distance(user_longitude : float, user_latitude : float) -> list[Homestay]:
     homestays = get_all_homestays()
+    #
+    # def dist_sort(homestay):
+    #     return calculate_route_distance(user_latitude, user_longitude,
+    #                             homestay.latitude, homestay.longtitude,
+    #                             getenv("GRAPHHOPPER_API_KEY", None), "foot")
 
     def dist_sort(homestay):
         return calculate_route_distance(user_latitude, user_longitude,
-                                homestay.latitude, homestay.longtitude,
-                                getenv("GRAPHHOPPER_API_KEY", None), "foot")
+                                homestay.latitude, homestay.longtitude)
     
     homestays.sort(key=lambda h: dist_sort(h))
 

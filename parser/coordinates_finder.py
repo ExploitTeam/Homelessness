@@ -27,14 +27,12 @@ def _houses_equal(wanted: str, got: str) -> bool:
     return _extract_house(wanted) == _extract_house(got)
 
 
-def get_coordinates(address: str, city: str | None = None) -> tuple[float, float, bool] | None:
+def get_coordinates(address: str, city: str | None = None) -> tuple[float, float, bool]:
     global _last_request_time
-    from parser.neural_network import clear_address
 
     if not address or not address.strip():
         raise ValueError("Адрес не может быть пустым.")
 
-    #address = clear_address(address)
     elapsed = time.monotonic() - _last_request_time
     if elapsed < 1.0:
         time.sleep(1.0 - elapsed)
