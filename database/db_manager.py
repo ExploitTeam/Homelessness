@@ -5,7 +5,7 @@ from os import getenv
 from dotenv import load_dotenv
 
 load_dotenv()
-database_name = f"{getenv('DB_NAME', 'default')}.db"
+database_name = f"{getenv('DB_NAME', 'database')}.db"
 
 
 def initialize_database():
