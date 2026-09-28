@@ -8,6 +8,8 @@ from pathlib import Path
 
 from starlette import status
 from starlette.staticfiles import StaticFiles
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+
 from maxbot.bot_manager import bot
 import uvicorn
 from fastapi import FastAPI, HTTPException, Depends, Security
@@ -19,7 +21,7 @@ from database.db_manager import *
 from maxbot.inline_keyboard import InlineKeyboardMarkup, button_types
 
 app = FastAPI(title="HOMELESSNESS API")
-
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="127.0.0.1")
 BOT_TOKEN = os.getenv("MAX_TOKEN", "")
 JWT_SECRET = os.getenv("JWT_SECRET", "")
 JWT_ALGORITHM = "HS256"
