@@ -142,39 +142,50 @@ export async function bookHostel(
     let serverMessage = "";
 
     try {
-      const data = await response.json();
+      const responseText = await response.text();
 
-      if (typeof data?.message === "string") {
-        serverMessage = data.message;
+      if (responseText) {
+        try {
+          const data = JSON.parse(responseText);
+
+          if (typeof data === "string") {
+            serverMessage = data;
+          } else if (typeof data?.message === "string") {
+            serverMessage = data.message;
+          } else if (typeof data?.detail === "string") {
+            serverMessage = data.detail;
+          } else if (typeof data?.error === "string") {
+            serverMessage = data.error;
+          }
+        } catch {
+          serverMessage = responseText;
+        }
       }
     } catch {
-      // Сервер мог вернуть не JSON
+      // Не удалось прочитать ответ сервера
     }
 
     if (response.status === 404) {
       throw new Error(
-        serverMessage ||
-          "Пункт или пользователь не найден"
+        "Пункт или пользователь не найден. Попробуйте обновить приложение."
       );
     }
 
     if (response.status === 400) {
       throw new Error(
-        serverMessage ||
-          "Нет доступных мест в данном пункте"
+        "В этом пункте сейчас нет свободных мест."
       );
     }
 
     if (response.status === 429) {
       throw new Error(
-        serverMessage ||
-          "Повторное бронирование возможно только через 5 минут"
+        "Вы уже недавно отправляли заявку. Повторное бронирование доступно через 5 минут."
       );
     }
 
     throw new Error(
       serverMessage ||
-        `Ошибка бронирования: ${response.status}`
+        "Не удалось забронировать место. Попробуйте ещё раз."
     );
   }
 

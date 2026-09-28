@@ -92,7 +92,7 @@ function App() {
 
         setTimeout(() => {
           setBookingMessage(null);
-        }, 4000);
+        }, 5000);
       } catch (error) {
         console.error(
           "Ошибка бронирования:",
@@ -138,28 +138,72 @@ function App() {
         <div
           style={{
             position: "fixed",
+            top: "20px",
             left: "50%",
-            bottom: "24px",
             transform: "translateX(-50%)",
-            zIndex: 1000,
-            padding: "14px 22px",
-            borderRadius: "14px",
-            background:
-              bookingMessage.includes("успешно")
-                ? "#22c55e"
-                : "#ef4444",
-            color: "#fff",
-            fontSize: "16px",
-            fontWeight: 600,
+            zIndex: 999999,
+            width: "calc(100% - 32px)",
+            maxWidth: "420px",
+            boxSizing: "border-box",
+            padding: "16px 18px",
+            borderRadius: "16px",
+            background: bookingMessage.includes("успешно")
+              ? "#16a34a"
+              : "#dc2626",
+            color: "#ffffff",
             boxShadow:
-              "0 8px 30px rgba(0, 0, 0, 0.25)",
-            textAlign: "center",
+              "0 10px 35px rgba(0, 0, 0, 0.28)",
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "12px",
+            fontFamily: "inherit",
           }}
         >
-          {bookingMessage.includes("успешно")
-            ? "✓ "
-            : "⚠️ "}
-          {bookingMessage}
+          <div
+            style={{
+              width: "34px",
+              height: "34px",
+              minWidth: "34px",
+              borderRadius: "50%",
+              background: "rgba(255, 255, 255, 0.18)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "18px",
+            }}
+          >
+            {bookingMessage.includes("успешно") ? "✓" : "!"}
+          </div>
+
+          <div
+            style={{
+              flex: 1,
+              minWidth: 0,
+            }}
+          >
+            <div
+              style={{
+                fontSize: "15px",
+                fontWeight: 700,
+                marginBottom: "4px",
+              }}
+            >
+              {bookingMessage.includes("успешно")
+                ? "Бронирование успешно"
+                : "Не удалось забронировать"}
+            </div>
+
+            <div
+              style={{
+                fontSize: "14px",
+                lineHeight: 1.45,
+                fontWeight: 400,
+                opacity: 0.95,
+              }}
+            >
+              {bookingMessage}
+            </div>
+          </div>
         </div>
       )}
 
