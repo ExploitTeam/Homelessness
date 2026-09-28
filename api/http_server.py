@@ -20,8 +20,9 @@ from fastapi.responses import FileResponse
 from database.db_manager import *
 from maxbot.inline_keyboard import InlineKeyboardMarkup, button_types
 
-app = FastAPI(title="HOMELESSNESS API")
-app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="127.0.0.1")
+app = FastAPI(title="HOMELESSNESS API", servers=[
+        {"url": "https://bot.nu", "description": "Production server"}
+    ])
 BOT_TOKEN = os.getenv("MAX_TOKEN", "")
 JWT_SECRET = os.getenv("JWT_SECRET", "")
 JWT_ALGORITHM = "HS256"
