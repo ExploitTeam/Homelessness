@@ -7,9 +7,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from starlette import status
+from starlette.middleware.cors import CORSMiddleware
 from starlette.staticfiles import StaticFiles
-from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
-
 from maxbot.bot_manager import bot
 import uvicorn
 from fastapi import FastAPI, HTTPException, Depends, Security
@@ -20,9 +19,18 @@ from fastapi.responses import FileResponse
 from database.db_manager import *
 from maxbot.inline_keyboard import InlineKeyboardMarkup, button_types
 
-app = FastAPI(title="HOMELESSNESS API", servers=[
-        {"url": "https://bot.nu", "description": "Production server"}
-    ])
+app = FastAPI(title="HOMELESSNESS API")
+app.add_middleware(
+    CORSMiddleware,
+    # Разрешаем запросы с любых сайтов (включая editor.swagger.io)
+    allow_origins=["*"],
+    # Обязательно разрешаем передавать куки и заголовки авторизации
+    allow_credentials=True,
+    # Разрешаем все методы (GET, POST, OPTIONS, PUT, DELETE)
+    allow_methods=["*"],
+    # Обязательно разрешаем любые заголовки (включая Authorization и Accept)
+    allow_headers=["*"],
+)
 BOT_TOKEN = os.getenv("MAX_TOKEN", "")
 JWT_SECRET = os.getenv("JWT_SECRET", "")
 JWT_ALGORITHM = "HS256"

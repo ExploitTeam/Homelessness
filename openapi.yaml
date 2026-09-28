@@ -1,0 +1,150 @@
+openapi: 3.1.0
+info:
+  title: HOMELESSNESS API
+  version: 0.1.0
+paths:
+  /api/auth:
+    post:
+      summary: Auth Mini App
+      description: Точка входа. Сюда фронтенд отправляет initData при запуске приложения.
+      operationId: auth_mini_app_api_auth_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthRequest"
+        required: true
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+  /api/places:
+    get:
+      summary: Info
+      description: 'Защищенный эндпоинт. Доступен только с валидным JWT-токеном. Заголовки запроса от фронта: Authorization: Bearer'
+      operationId: info_api_places_get
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+      security:
+        - HTTPBearer: []
+  /api/book:
+    post:
+      summary: Book
+      description: Защищенное бронирование места
+      operationId: book_api_book_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookingRequest"
+        required: true
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+      security:
+        - HTTPBearer: []
+  /{full_path}:
+    get:
+      summary: Spa
+      operationId: spa__full_path__get
+      parameters:
+        - name: full_path
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Full Path
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+components:
+  schemas:
+    AuthRequest:
+      properties:
+        initData:
+          type: string
+          title: Initdata
+      type: object
+      required:
+        - initData
+      title: AuthRequest
+    BookingRequest:
+      properties:
+        id_homestay:
+          type: integer
+          title: Id Homestay
+      type: object
+      required:
+        - id_homestay
+      title: BookingRequest
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: "#/components/schemas/ValidationError"
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+              - type: string
+              - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+        - loc
+        - msg
+        - type
+      title: ValidationError
+  securitySchemes:
+    HTTPBearer:
+      type: http
+      scheme: bearer
+servers:
+- url: https://homelessness.bot.nu
