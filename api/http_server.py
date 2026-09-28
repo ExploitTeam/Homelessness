@@ -16,7 +16,6 @@ from pydantic import BaseModel
 import jwt
 from fastapi.responses import FileResponse
 from database.db_manager import *
-from maxbot.functions import is_point_open
 from maxbot.inline_keyboard import InlineKeyboardMarkup, button_types
 
 app = FastAPI(title="HOMELESSNESS API")

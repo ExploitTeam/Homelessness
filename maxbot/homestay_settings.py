@@ -1,11 +1,6 @@
-import json
-import sqlite3
 from maxbot.bot_manager import bot, keyboard_to_start
-from database.db_manager import *
 from maxbot.functions import *
-from maxbot.maxapi import Bot
 import dotenv
-from parser.parser import proceed_parsing
 import parser.coordinates_finder as coordinates_finder
 from database import db_manager, classes
 
@@ -663,12 +658,12 @@ async def handle_homestay_management(update, bot):
     action_func = HOMESTAY_ACTIONS[command]
     await action_func(sender_id, homestay_id, bot, update)
 
-@bot.message_handler(func=lambda msg, tp:
-msg.get("callback", {}).get("payload", "") == "update_db")
-async def update_db(update, bot):
-    if not await require_admin(update, bot):
-        return
-    msg_id = update.get('message', {}).get('body', {}).get('mid', "")
-    await bot.edit_msg(msg_id, f"🔄 Обновление данных... Пожалуйста, ждите.")
-    proceed_parsing()
-    await edit_user_button_pressed(update, bot)
+# @bot.message_handler(func=lambda msg, tp:
+# msg.get("callback", {}).get("payload", "") == "update_db")
+# async def update_db(update, bot):
+#     if not await require_admin(update, bot):
+#         return
+#     msg_id = update.get('message', {}).get('body', {}).get('mid', "")
+#     await bot.edit_msg(msg_id, f"🔄 Обновление данных... Пожалуйста, ждите.")
+#     proceed_parsing()
+#     await edit_user_button_pressed(update, bot)
