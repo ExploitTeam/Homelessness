@@ -138,41 +138,44 @@ function App() {
         <div
           style={{
             position: "fixed",
-            top: "20px",
+            top: "50%",
             left: "50%",
-            transform: "translateX(-50%)",
+            transform: "translate(-50%, -50%)",
             zIndex: 999999,
             width: "calc(100% - 32px)",
             maxWidth: "420px",
             boxSizing: "border-box",
-            padding: "16px 18px",
-            borderRadius: "16px",
+            padding: "20px",
+            borderRadius: "18px",
             background: bookingMessage.includes("успешно")
               ? "#16a34a"
               : "#dc2626",
             color: "#ffffff",
             boxShadow:
-              "0 10px 35px rgba(0, 0, 0, 0.28)",
+              "0 15px 45px rgba(0, 0, 0, 0.35)",
             display: "flex",
             alignItems: "flex-start",
-            gap: "12px",
+            gap: "14px",
             fontFamily: "inherit",
           }}
         >
           <div
             style={{
-              width: "34px",
-              height: "34px",
-              minWidth: "34px",
+              width: "40px",
+              height: "40px",
+              minWidth: "40px",
               borderRadius: "50%",
-              background: "rgba(255, 255, 255, 0.18)",
+              background: "rgba(255, 255, 255, 0.2)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: "18px",
+              fontSize: "21px",
+              fontWeight: 700,
             }}
           >
-            {bookingMessage.includes("успешно") ? "✓" : "!"}
+            {bookingMessage.includes("успешно")
+              ? "✓"
+              : "!"}
           </div>
 
           <div
@@ -183,9 +186,9 @@ function App() {
           >
             <div
               style={{
-                fontSize: "15px",
+                fontSize: "16px",
                 fontWeight: 700,
-                marginBottom: "4px",
+                marginBottom: "6px",
               }}
             >
               {bookingMessage.includes("успешно")
@@ -196,7 +199,7 @@ function App() {
             <div
               style={{
                 fontSize: "14px",
-                lineHeight: 1.45,
+                lineHeight: 1.5,
                 fontWeight: 400,
                 opacity: 0.95,
               }}
