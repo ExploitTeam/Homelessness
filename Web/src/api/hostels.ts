@@ -72,7 +72,7 @@ export interface BackendPlace {
   additional_info: string | null;
   homestay_type: number;
 
-  // именно названия из БД
+  // Названия полей соответствуют БД
   longtitude: number | null;
   latitude: number | null;
 
@@ -90,15 +90,20 @@ interface PlacesResponse {
   places: BackendPlace[];
 }
 
-export async function getHostels(): Promise<BackendPlace[]> {
+export async function getHostels(): Promise<
+  BackendPlace[]
+> {
   const token = await authorize();
 
-  const response = await fetch(`${API_URL}/api/places`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+  const response = await fetch(
+    `${API_URL}/api/places`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
 
   if (!response.ok) {
     throw new Error(
@@ -106,7 +111,8 @@ export async function getHostels(): Promise<BackendPlace[]> {
     );
   }
 
-  const data: PlacesResponse = await response.json();
+  const data: PlacesResponse =
+    await response.json();
 
   console.log("PLACES FROM SERVER:", data);
 
@@ -127,36 +133,54 @@ export async function bookHostel(
 ): Promise<BookHostelResponse> {
   const token = await authorize();
 
-  const response = await fetch(`${API_URL}/api/book`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      id_homestay: params.hostelId,
-    }),
-  });
+  const response = await fetch(
+    `${API_URL}/api/book`,
+    {
+      method: "POST",
 
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+
+      body: JSON.stringify({
+        id_homestay: params.hostelId,
+      }),
+    }
+  );
+
+  /*
+   * Обработка ошибок бронирования
+   */
   if (!response.ok) {
-    // Читаем ответ сервера, но технические данные
-    // пользователю напрямую не показываем.
     let serverMessage = "";
 
+    /*
+     * Ответ сервера читаем для console.error,
+     * но напрямую пользователю его не показываем.
+     */
     try {
-      const responseText = await response.text();
+      const responseText =
+        await response.text();
 
       if (responseText) {
         try {
-          const data = JSON.parse(responseText);
+          const data =
+            JSON.parse(responseText);
 
           if (typeof data === "string") {
             serverMessage = data;
-          } else if (typeof data?.message === "string") {
+          } else if (
+            typeof data?.message === "string"
+          ) {
             serverMessage = data.message;
-          } else if (typeof data?.detail === "string") {
+          } else if (
+            typeof data?.detail === "string"
+          ) {
             serverMessage = data.detail;
-          } else if (typeof data?.error === "string") {
+          } else if (
+            typeof data?.error === "string"
+          ) {
             serverMessage = data.error;
           }
         } catch {
@@ -167,27 +191,67 @@ export async function bookHostel(
       // Не удалось прочитать ответ сервера
     }
 
+    console.error(
+      "Ошибка бронирования:",
+      {
+        status: response.status,
+        serverMessage,
+      }
+    );
+
+    /*
+     * 404
+     *
+     * Пункт или пользователь не найден
+     */
     if (response.status === 404) {
       throw new Error(
-        "Не удалось найти эту ночлежку или ваш профиль. Попробуйте обновить приложение."
+        "Не удалось найти выбранную ночлежку или ваш профиль. Обновите приложение и попробуйте снова."
       );
     }
 
+    /*
+     * 400
+     *
+     * Нет доступных мест
+     */
     if (response.status === 400) {
       throw new Error(
-        "В этой ночлежке сейчас нет свободных мест."
+        "К сожалению, в этой ночлежке сейчас нет свободных мест."
       );
     }
 
+    /*
+     * 429
+     *
+     * Повторный запрос в течение 5 секунд
+     */
     if (response.status === 429) {
       throw new Error(
-        "Вы уже забронировали эту ночлежку. Повторное бронирование будет доступно через 5 минут."
+        "Вы слишком быстро отправили повторный запрос. Подождите 5 секунд и попробуйте снова."
       );
     }
 
+    /*
+     * 409
+     *
+     * Эта ночлежка уже забронирована
+     * данным пользователем
+     */
+    if (response.status === 409) {
+      throw new Error(
+        "Вы уже забронировали место в этой ночлежке."
+      );
+    }
+
+    /*
+     * Любая другая ошибка.
+     *
+     * Технический ответ backend пользователю
+     * не показываем.
+     */
     throw new Error(
-      serverMessage ||
-        "Не удалось забронировать место. Попробуйте ещё раз."
+      "Не удалось забронировать место. Попробуйте ещё раз."
     );
   }
 
