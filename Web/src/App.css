@@ -68,8 +68,51 @@ button {
   user-select: none;
 }
 
+/* Когда карточка опущена, видимая верхняя часть работает как кнопка:
+   достаточно кликнуть/тапнуть по ней, чтобы вернуть карточку наверх. */
+.hostel-card--collapsed {
+  cursor: pointer;
+}
+
+.hostel-card--collapsed .hostel-card__sheet-handle-area {
+  cursor: pointer;
+}
+
 .hostel-card__sheet-handle-area {
-  display: none;
+  position: sticky;
+  z-index: 12;
+  top: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 100%;
+  height: 30px;
+  margin: 0;
+
+  background:
+    linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 1) 0%,
+      rgba(255, 255, 255, 0.97) 74%,
+      rgba(255, 255, 255, 0) 100%
+    );
+
+  touch-action: none;
+  cursor: ns-resize;
+}
+
+.hostel-card--dragging .hostel-card__sheet-handle-area {
+  cursor: grabbing;
+}
+
+.hostel-card__sheet-handle {
+  width: 52px;
+  height: 5px;
+  border-radius: 999px;
+  background: #c7c7cc;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
 }
 
 .hostel-card__content {
@@ -78,7 +121,7 @@ button {
 }
 
 .hostel-card__content--main {
-  padding-top: 28px;
+  padding-top: 12px;
 }
 
 .hostel-card h2 {
@@ -91,7 +134,7 @@ button {
 .hostel-card__close {
   position: absolute;
   z-index: 8;
-  top: 14px;
+  top: 34px;
   right: 14px;
   width: 38px;
   height: 38px;
@@ -591,46 +634,10 @@ button {
     overscroll-behavior: contain;
   }
 
-  .hostel-card__sheet-handle-area {
-    position: sticky;
-    z-index: 10;
-    top: 0;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    width: 100%;
-    height: 28px;
-    margin: 0;
-
-    background:
-      linear-gradient(
-        to bottom,
-        rgba(255, 255, 255, 1) 0%,
-        rgba(255, 255, 255, 0.96) 72%,
-        rgba(255, 255, 255, 0) 100%
-      );
-
-    touch-action: none;
-    cursor: grab;
-  }
-
-  .hostel-card--dragging .hostel-card__sheet-handle-area {
-    cursor: grabbing;
-  }
-
-  .hostel-card__sheet-handle {
-    width: 44px;
-    height: 5px;
-    border-radius: 999px;
-    background: #c7c7cc;
-  }
-
   .hostel-card__close {
     position: sticky;
     float: right;
-    top: 32px;
+    top: 34px;
     margin: 0 10px -38px 0;
   }
 

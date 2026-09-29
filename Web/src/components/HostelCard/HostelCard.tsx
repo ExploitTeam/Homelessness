@@ -2,6 +2,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 
@@ -192,6 +193,8 @@ export default function HostelCard({
 }: HostelCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
 
+  const suppressCollapsedClickRef = useRef(false);
+
   const dragRef = useRef<DragState>({
     active: false,
     startY: 0,
@@ -225,25 +228,18 @@ export default function HostelCard({
   const isBooked = booked || serverBooking !== null;
 
   const getCollapsedOffset = (): number => {
-    if (!isMobileViewport()) {
-      return 0;
-    }
-
     const height =
       cardRef.current?.getBoundingClientRect().height ?? 0;
 
-    // Оставляем сверху примерно 124px панели:
-    // drag-handle, название и начало адреса.
-    return Math.max(0, height - 124);
+    // На телефоне оставляем видимыми ручку + заголовок/часть адреса.
+    // На desktop/fullscreen оставляем компактную полоску с ручкой,
+    // чтобы карта почти полностью была доступна после построения маршрута.
+    const peekHeight = isMobileViewport() ? 124 : 72;
+
+    return Math.max(0, height - peekHeight);
   };
 
   const setSheetPosition = (collapsed: boolean) => {
-    if (!isMobileViewport()) {
-      dragRef.current.currentOffset = 0;
-      setSheetOffset(0);
-      return;
-    }
-
     const nextOffset = collapsed
       ? getCollapsedOffset()
       : 0;
@@ -273,12 +269,6 @@ export default function HostelCard({
 
   useEffect(() => {
     const handleResize = () => {
-      if (!isMobileViewport()) {
-        dragRef.current.currentOffset = 0;
-        setSheetOffset(0);
-        return;
-      }
-
       const maxOffset = getCollapsedOffset();
 
       setSheetOffset((current) => {
@@ -387,17 +377,17 @@ export default function HostelCard({
     setShowRoute(true);
     onShowRoute(metroRoute);
 
-    // На телефоне сразу опускаем карточку,
-    // чтобы построенный на карте маршрут был виден.
-    if (isMobileViewport()) {
-      if (cardRef.current) {
-        cardRef.current.scrollTop = 0;
-      }
-
-      window.requestAnimationFrame(() => {
-        setSheetPosition(true);
-      });
+    // После построения маршрута опускаем карточку на любом размере экрана.
+    // На телефоне остаётся видимой верхняя часть карточки, на desktop/fullscreen
+    // — компактная полоска с ручкой. Карточку можно вытянуть обратно
+    // вверх пальцем или мышкой.
+    if (cardRef.current) {
+      cardRef.current.scrollTop = 0;
     }
+
+    window.requestAnimationFrame(() => {
+      setSheetPosition(true);
+    });
   };
 
   const handleContacts = () => {
@@ -412,10 +402,9 @@ export default function HostelCard({
   const handleSheetPointerDown = (
     event: ReactPointerEvent<HTMLDivElement>
   ) => {
-    if (!isMobileViewport()) {
-      return;
-    }
-
+    // Pointer Events работают и для touch, и для мыши.
+    // Поэтому один и тот же drag-механизм используется на телефоне
+    // и в полноэкранной desktop-версии.
     event.preventDefault();
 
     const maxOffset = getCollapsedOffset();
@@ -466,20 +455,40 @@ export default function HostelCard({
     setSheetDragging(false);
 
     const delta = event.clientY - state.startY;
+    const movement = Math.abs(delta);
 
-    // Явный свайп вниз/вверх имеет приоритет.
-    // При маленьком движении выбираем ближайшее положение.
-    const collapse =
-      delta > 42 ||
-      (delta >= -42 &&
-        state.currentOffset > state.maxOffset / 2);
+    /*
+     * Обычный клик/тап по ручке, когда карточка уже опущена,
+     * раскрывает её без необходимости тянуть вверх.
+     *
+     * Если пользователь действительно перетаскивал карточку,
+     * следующий browser click подавляем, чтобы она не раскрылась
+     * сразу после свайпа вниз.
+     */
+    if (
+      movement <= 8 &&
+      state.startOffset > state.maxOffset / 2
+    ) {
+      state.currentOffset = 0;
+      setSheetOffset(0);
+      suppressCollapsedClickRef.current = false;
+    } else {
+      suppressCollapsedClickRef.current = movement > 8;
 
-    const nextOffset = collapse
-      ? state.maxOffset
-      : 0;
+      // Явный свайп вниз/вверх имеет приоритет.
+      // При маленьком движении выбираем ближайшее положение.
+      const collapse =
+        delta > 42 ||
+        (delta >= -42 &&
+          state.currentOffset > state.maxOffset / 2);
 
-    state.currentOffset = nextOffset;
-    setSheetOffset(nextOffset);
+      const nextOffset = collapse
+        ? state.maxOffset
+        : 0;
+
+      state.currentOffset = nextOffset;
+      setSheetOffset(nextOffset);
+    }
 
     try {
       event.currentTarget.releasePointerCapture(
@@ -490,15 +499,45 @@ export default function HostelCard({
     }
   };
 
+  const handleCollapsedCardClick = (
+    event: ReactMouseEvent<HTMLDivElement>
+  ) => {
+    if (sheetOffset <= 8 || sheetDragging) {
+      return;
+    }
+
+    if (suppressCollapsedClickRef.current) {
+      suppressCollapsedClickRef.current = false;
+      return;
+    }
+
+    const target = event.target as HTMLElement;
+
+    // Крестик должен по-прежнему закрывать карточку,
+    // а не сначала раскрывать её.
+    if (target.closest(".hostel-card__close")) {
+      return;
+    }
+
+    setSheetPosition(false);
+
+    if (cardRef.current) {
+      cardRef.current.scrollTop = 0;
+    }
+  };
+
   return (
     <div
       ref={cardRef}
       className={`hostel-card ${
         sheetDragging ? "hostel-card--dragging" : ""
+      } ${
+        sheetOffset > 8 ? "hostel-card--collapsed" : ""
       }`}
       style={{
         transform: `translateX(-50%) translateY(${sheetOffset}px)`,
       }}
+      onClick={handleCollapsedCardClick}
     >
       <div
         className="hostel-card__sheet-handle-area"
