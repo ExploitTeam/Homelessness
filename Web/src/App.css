@@ -37,6 +37,8 @@ button {
    ========================= */
 
 .hostel-card {
+  --hostel-sheet-peek: 88px;
+
   position: fixed;
   z-index: 1000;
 
@@ -59,6 +61,9 @@ button {
     0 20px 55px rgba(0, 0, 0, 0.2),
     0 3px 10px rgba(0, 0, 0, 0.08);
 
+  /* Позиция задаётся CSS, а не вычисляется JS.
+     Процент translateY считается от собственной высоты карточки. */
+  transform: translate3d(-50%, 0, 0);
   transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform;
 }
@@ -70,37 +75,50 @@ button {
 
 /* Когда карточка опущена, видимая верхняя часть работает как кнопка:
    достаточно кликнуть/тапнуть по ней, чтобы вернуть карточку наверх. */
-.hostel-card--collapsed {
-  cursor: pointer;
+.hostel-card--expanded {
+  transform: translate3d(-50%, 0, 0);
 }
 
-.hostel-card--collapsed .hostel-card__sheet-handle-area {
+.hostel-card--collapsed {
+  /* Не зависит от window.innerHeight / offsetHeight / масштаба MAX. */
+  transform: translate3d(
+    -50%,
+    calc(100% - var(--hostel-sheet-peek)),
+    0
+  );
   cursor: pointer;
 }
 
 /*
- * Явная зона клика поверх всей видимой части свернутой карточки.
- * Это не полагается на browser click после drag: Pointer Events
- * обрабатываются непосредственно этой областью, поэтому одинаково
- * работают мышь и палец.
+ * Явная зона клика/drag поверх всей верхней части карточки в обоих состояниях.
+ * Она остаётся sticky при прокрутке и работает как для мыши, так и для touch.
  */
-.hostel-card__collapsed-hitbox {
-  position: absolute;
-  z-index: 20;
+.hostel-card__sheet-hitbox {
+  position: sticky;
+  z-index: 25;
   top: 0;
-  left: 0;
-  right: 0;
-  height: 72px;
+
+  display: block;
+  width: 100%;
+  height: var(--hostel-sheet-peek);
+  margin: 0 0 calc(-1 * var(--hostel-sheet-peek));
+  padding: 0;
 
   background: transparent;
   border: 0;
   outline: none;
 
-  cursor: pointer;
+  cursor: ns-resize;
   touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
-.hostel-card__collapsed-hitbox:focus-visible {
+.hostel-card--collapsed .hostel-card__sheet-hitbox {
+  cursor: pointer;
+}
+
+.hostel-card__sheet-hitbox:focus-visible {
   outline: 2px solid #2563eb;
   outline-offset: -4px;
   border-radius: 20px 20px 0 0;
@@ -127,6 +145,7 @@ button {
       rgba(255, 255, 255, 0) 100%
     );
 
+  pointer-events: none;
   touch-action: none;
   cursor: pointer;
   user-select: none;
@@ -649,10 +668,6 @@ button {
    ========================= */
 
 @media (max-width: 600px) {
-  .hostel-card__collapsed-hitbox {
-    height: 124px;
-  }
-
   .hostel-card {
     left: 50%;
     right: auto;

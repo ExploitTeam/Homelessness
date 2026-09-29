@@ -145,13 +145,6 @@ function isCurrentlyOpen(
   );
 }
 
-function isMobileViewport(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    window.matchMedia("(max-width: 600px)").matches
-  );
-}
-
 function formatServerDate(value: string): string {
   if (!value) {
     return "Не указано";
@@ -212,11 +205,19 @@ export default function HostelCard({
   const [booking, setBooking] =
     useState(false);
 
-  const [sheetOffset, setSheetOffset] =
-    useState(0);
+  const [sheetCollapsed, setSheetCollapsed] =
+    useState(false);
 
   const [sheetDragging, setSheetDragging] =
     useState(false);
+
+  // Во время drag используем временный pixel-offset.
+  // В обычном состоянии позиция задаётся CSS-классом через translateY(calc(100% - peek)),
+  // поэтому автоматическое сворачивание вообще не зависит от измерений WebView.
+  const [dragOffset, setDragOffset] =
+    useState<number | null>(null);
+
+  const suppressClickRef = useRef(false);
 
   const [, setCurrentTime] =
     useState(Date.now());
@@ -227,31 +228,45 @@ export default function HostelCard({
 
   const isBooked = booked || serverBooking !== null;
 
+  const getSheetPeekHeight = (): number => {
+    const element = cardRef.current;
+
+    if (!element) {
+      return 72;
+    }
+
+    const rawValue = window
+      .getComputedStyle(element)
+      .getPropertyValue("--hostel-sheet-peek");
+
+    const parsed = Number.parseFloat(rawValue);
+    return Number.isFinite(parsed) ? parsed : 72;
+  };
+
   const getCollapsedOffset = (): number => {
-    const height = cardRef.current?.offsetHeight ?? 0;
-
-    // На телефоне оставляем видимыми ручку + заголовок/часть адреса.
-    // На desktop/fullscreen оставляем компактную полоску с ручкой,
-    // чтобы карта почти полностью была доступна после построения маршрута.
-    const peekHeight = isMobileViewport() ? 124 : 72;
-
-    return Math.max(0, height - peekHeight);
+    const height = cardRef.current?.getBoundingClientRect().height ?? 0;
+    return Math.max(0, height - getSheetPeekHeight());
   };
 
   const setSheetPosition = (collapsed: boolean) => {
-    const nextOffset = collapsed
-      ? getCollapsedOffset()
-      : 0;
+    setDragOffset(null);
+    setSheetCollapsed(collapsed);
+  };
 
-    dragRef.current.currentOffset = nextOffset;
-    setSheetOffset(nextOffset);
+  const suppressSyntheticClick = () => {
+    suppressClickRef.current = true;
+
+    window.setTimeout(() => {
+      suppressClickRef.current = false;
+    }, 350);
   };
 
   useEffect(() => {
     setShowContacts(false);
     setShowRoute(false);
     setBooking(false);
-    setSheetOffset(0);
+    setSheetCollapsed(false);
+    setDragOffset(null);
     dragRef.current.currentOffset = 0;
     onShowRoute(null);
   }, [hostel.id, onShowRoute]);
@@ -263,24 +278,6 @@ export default function HostelCard({
 
     return () => {
       window.clearInterval(interval);
-    };
-  }, []);
-
-  useEffect(() => {
-    const handleResize = () => {
-      const maxOffset = getCollapsedOffset();
-
-      setSheetOffset((current) => {
-        const next = Math.min(current, maxOffset);
-        dragRef.current.currentOffset = next;
-        return next;
-      });
-    };
-
-    window.addEventListener("resize", handleResize);
-
-    return () => {
-      window.removeEventListener("resize", handleResize);
     };
   }, []);
 
@@ -376,21 +373,14 @@ export default function HostelCard({
     setShowRoute(true);
     onShowRoute(metroRoute);
 
-    // После построения маршрута опускаем карточку на любом размере экрана.
-    // На телефоне остаётся видимой верхняя часть карточки, на desktop/fullscreen
-    // — компактная полоска с ручкой. Карточку можно вытянуть обратно
-    // вверх пальцем или мышкой.
+    // Сворачиваем сразу. CSS использует процент от собственной высоты карточки,
+    // поэтому здесь нет ни requestAnimationFrame, ни измерения offsetHeight.
+    // Это одинаково работает в браузере, MAX Desktop/Web и мобильном WebView.
     if (cardRef.current) {
       cardRef.current.scrollTop = 0;
     }
 
-    // Два кадра дают React/WebView MAX время применить новый DOM,
-    // после чего высота карточки измеряется корректно и она сворачивается.
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        setSheetPosition(true);
-      });
-    });
+    setSheetPosition(true);
   };
 
   const handleContacts = () => {
@@ -407,16 +397,18 @@ export default function HostelCard({
     input: "mouse" | "touch"
   ) => {
     const maxOffset = getCollapsedOffset();
+    const startOffset = sheetCollapsed ? maxOffset : 0;
 
     dragRef.current = {
       active: true,
       input,
       startY: clientY,
-      startOffset: sheetOffset,
-      currentOffset: sheetOffset,
+      startOffset,
+      currentOffset: startOffset,
       maxOffset,
     };
 
+    setDragOffset(startOffset);
     setSheetDragging(true);
   };
 
@@ -434,7 +426,7 @@ export default function HostelCard({
     );
 
     state.currentOffset = next;
-    setSheetOffset(next);
+    setDragOffset(next);
   };
 
   const finishSheetDragAt = (clientY: number) => {
@@ -450,37 +442,26 @@ export default function HostelCard({
     state.active = false;
     state.input = null;
     setSheetDragging(false);
+    setDragOffset(null);
 
-    let nextOffset: number;
-
-    if (movement <= 8) {
-      /*
-       * В MAX WebView простой клик надёжнее drag-жеста.
-       * Поэтому короткое нажатие по верхней ручке переключает
-       * состояние карточки в обе стороны:
-       * раскрыта -> свернуть, свернута -> раскрыть.
-       */
-      const wasCollapsed =
-        state.startOffset > state.maxOffset / 2;
-
-      nextOffset = wasCollapsed
-        ? 0
-        : state.maxOffset;
-    } else {
-      const collapse =
-        delta > 42 ||
-        (delta >= -42 &&
-          state.currentOffset > state.maxOffset / 2);
-
-      nextOffset = collapse
-        ? state.maxOffset
-        : 0;
+    if (movement <= 10) {
+      // Короткое нажатие всегда переключает карточку.
+      // Это происходит уже на mouseup/touchend и не зависит от события click,
+      // которое MAX WebView иногда подавляет.
+      setSheetCollapsed((current) => !current);
+      suppressSyntheticClick();
+      return;
     }
 
-    state.currentOffset = nextOffset;
-    setSheetOffset(nextOffset);
+    const collapse =
+      delta > 44 ||
+      (delta >= -44 &&
+        state.currentOffset > state.maxOffset / 2);
 
-    if (nextOffset === 0 && cardRef.current) {
+    setSheetCollapsed(collapse);
+    suppressSyntheticClick();
+
+    if (!collapse && cardRef.current) {
       cardRef.current.scrollTop = 0;
     }
   };
@@ -492,6 +473,8 @@ export default function HostelCard({
       return;
     }
 
+    // Не полагаемся на Pointer Events / setPointerCapture: MAX Desktop
+    // может обрабатывать их иначе. Mouse drag отслеживается на window.
     event.preventDefault();
     beginSheetDrag(event.clientY, "mouse");
   };
@@ -505,56 +488,24 @@ export default function HostelCard({
       return;
     }
 
-    event.preventDefault();
+    // preventDefault здесь не нужен: touch-action:none задаётся CSS.
+    // Это важно для встроенных WebView, которые могут отменять последующие события.
     beginSheetDrag(touch.clientY, "touch");
   };
 
-  const handleSheetTouchMove = (
-    event: ReactTouchEvent<HTMLDivElement>
-  ) => {
-    const state = dragRef.current;
-
-    if (!state.active || state.input !== "touch") {
+  const handleSheetClick = () => {
+    // Обычный click — дополнительный fallback для браузеров.
+    // Основное переключение уже происходит на mouseup/touchend.
+    if (suppressClickRef.current) {
       return;
     }
 
-    const touch = event.touches[0];
-
-    if (!touch) {
-      return;
-    }
-
-    event.preventDefault();
-    updateSheetDrag(touch.clientY);
-  };
-
-  const handleSheetTouchEnd = (
-    event: ReactTouchEvent<HTMLDivElement>
-  ) => {
-    const state = dragRef.current;
-
-    if (!state.active || state.input !== "touch") {
-      return;
-    }
-
-    const touch = event.changedTouches[0];
-    finishSheetDragAt(touch?.clientY ?? state.startY);
-  };
-
-  const toggleSheet = () => {
-    const maxOffset = getCollapsedOffset();
-    const collapsed = sheetOffset > maxOffset / 2;
-    setSheetPosition(!collapsed);
-
-    if (collapsed && cardRef.current) {
-      cardRef.current.scrollTop = 0;
-    }
+    setSheetCollapsed((current) => !current);
   };
 
   /*
-   * В desktop/MAX не используем setPointerCapture.
-   * Движение мыши отслеживаем на window, поэтому карточка продолжает
-   * следовать за курсором даже если он вышел за пределы ручки.
+   * Mouse и touch слушаем на window, а не только на самой ручке.
+   * Поэтому жест не обрывается, если курсор/палец вышел за пределы карточки.
    */
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
@@ -578,14 +529,50 @@ export default function HostelCard({
       finishSheetDragAt(event.clientY);
     };
 
+    const handleTouchMove = (event: TouchEvent) => {
+      const state = dragRef.current;
+
+      if (!state.active || state.input !== "touch") {
+        return;
+      }
+
+      const touch = event.touches[0];
+
+      if (!touch) {
+        return;
+      }
+
+      event.preventDefault();
+      updateSheetDrag(touch.clientY);
+    };
+
+    const handleTouchEnd = (event: TouchEvent) => {
+      const state = dragRef.current;
+
+      if (!state.active || state.input !== "touch") {
+        return;
+      }
+
+      const touch = event.changedTouches[0];
+      finishSheetDragAt(touch?.clientY ?? state.startY);
+    };
+
     window.addEventListener("mousemove", handleMouseMove, {
       passive: false,
     });
     window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("touchmove", handleTouchMove, {
+      passive: false,
+    });
+    window.addEventListener("touchend", handleTouchEnd);
+    window.addEventListener("touchcancel", handleTouchEnd);
 
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleTouchEnd);
+      window.removeEventListener("touchcancel", handleTouchEnd);
     };
   });
 
@@ -595,52 +582,39 @@ export default function HostelCard({
       className={`hostel-card ${
         sheetDragging ? "hostel-card--dragging" : ""
       } ${
-        sheetOffset > 8 ? "hostel-card--collapsed" : ""
+        sheetCollapsed ? "hostel-card--collapsed" : "hostel-card--expanded"
       }`}
-      style={{
-        transform: `translateX(-50%) translateY(${sheetOffset}px)`,
-      }}
-    >
-      {sheetOffset > 8 && (
-        <div
-          className="hostel-card__collapsed-hitbox"
-          role="button"
-          tabIndex={0}
-          aria-label="Открыть карточку"
-          onMouseDown={handleSheetMouseDown}
-          onTouchStart={handleSheetTouchStart}
-          onTouchMove={handleSheetTouchMove}
-          onTouchEnd={handleSheetTouchEnd}
-          onTouchCancel={handleSheetTouchEnd}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              setSheetPosition(false);
+      style={
+        dragOffset !== null
+          ? {
+              transform: `translate3d(-50%, ${dragOffset}px, 0)`,
             }
-          }}
-        />
-      )}
-
+          : undefined
+      }
+    >
       <div
-        className="hostel-card__sheet-handle-area"
+        className="hostel-card__sheet-hitbox"
         role="button"
         tabIndex={0}
-        onMouseDown={handleSheetMouseDown}
-        onTouchStart={handleSheetTouchStart}
-        onTouchMove={handleSheetTouchMove}
-        onTouchEnd={handleSheetTouchEnd}
-        onTouchCancel={handleSheetTouchEnd}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            toggleSheet();
-          }
-        }}
         aria-label={
-          sheetOffset > 8
+          sheetCollapsed
             ? "Развернуть карточку"
             : "Свернуть карточку"
         }
+        onMouseDown={handleSheetMouseDown}
+        onTouchStart={handleSheetTouchStart}
+        onClick={handleSheetClick}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setSheetPosition(!sheetCollapsed);
+          }
+        }}
+      />
+
+      <div
+        className="hostel-card__sheet-handle-area"
+        aria-hidden="true"
       >
         <span className="hostel-card__sheet-handle" />
       </div>
