@@ -539,6 +539,25 @@ export default function HostelCard({
       }}
       onClick={handleCollapsedCardClick}
     >
+      {sheetOffset > 8 && (
+        <div
+          className="hostel-card__collapsed-hitbox"
+          role="button"
+          tabIndex={0}
+          aria-label="Открыть карточку"
+          onPointerDown={handleSheetPointerDown}
+          onPointerMove={handleSheetPointerMove}
+          onPointerUp={finishSheetDrag}
+          onPointerCancel={finishSheetDrag}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              setSheetPosition(false);
+            }
+          }}
+        />
+      )}
+
       <div
         className="hostel-card__sheet-handle-area"
         onPointerDown={handleSheetPointerDown}

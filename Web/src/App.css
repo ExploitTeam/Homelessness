@@ -78,6 +78,34 @@ button {
   cursor: pointer;
 }
 
+/*
+ * Явная зона клика поверх всей видимой части свернутой карточки.
+ * Это не полагается на browser click после drag: Pointer Events
+ * обрабатываются непосредственно этой областью, поэтому одинаково
+ * работают мышь и палец.
+ */
+.hostel-card__collapsed-hitbox {
+  position: absolute;
+  z-index: 20;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 72px;
+
+  background: transparent;
+  border: 0;
+  outline: none;
+
+  cursor: pointer;
+  touch-action: none;
+}
+
+.hostel-card__collapsed-hitbox:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: -4px;
+  border-radius: 20px 20px 0 0;
+}
+
 .hostel-card__sheet-handle-area {
   position: sticky;
   z-index: 12;
@@ -133,7 +161,7 @@ button {
 
 .hostel-card__close {
   position: absolute;
-  z-index: 8;
+  z-index: 30;
   top: 34px;
   right: 14px;
   width: 38px;
@@ -615,6 +643,10 @@ button {
    ========================= */
 
 @media (max-width: 600px) {
+  .hostel-card__collapsed-hitbox {
+    height: 124px;
+  }
+
   .hostel-card {
     left: 50%;
     right: auto;
