@@ -38,3 +38,10 @@ __pycache__/
 .LSOverride
 database.db
 database.db.sqbpro
+parser/neural_network.py
+parser/parser.py
+parser/sites_to_parse.txt
+parser/sys_prompt_clear_address.md
+parser/sys_prompt_coordinates.md
+parser/sys_prompt_parse.md
+parser/modules.py

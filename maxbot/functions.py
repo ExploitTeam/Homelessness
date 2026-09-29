@@ -19,8 +19,6 @@ start_text = ("Привет{} 👋\n"
 
 def show_all(name=None, get_in_dict=False):
     all = get_all_homestays()
-    if name:
-        all = sort_places(all, name)
     if get_in_dict:
         return all
     res = ""
