@@ -9,7 +9,6 @@ body,
   width: 100%;
   height: 100%;
   overflow: hidden;
-
   font-family:
     Inter,
     -apple-system,
@@ -47,19 +46,30 @@ button {
   width: min(460px, calc(100% - 24px));
   max-height: calc(100dvh - 40px);
 
-  transform: translateX(-50%);
-
   overflow-y: auto;
   overflow-x: hidden;
 
   background: #fff;
   color: #171717;
 
+  border: 1px solid rgba(0, 0, 0, 0.06);
   border-radius: 24px;
 
   box-shadow:
-    0 12px 40px rgba(0, 0, 0, 0.18),
-    0 2px 8px rgba(0, 0, 0, 0.08);
+    0 20px 55px rgba(0, 0, 0, 0.2),
+    0 3px 10px rgba(0, 0, 0, 0.08);
+
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.hostel-card--dragging {
+  transition: none;
+  user-select: none;
+}
+
+.hostel-card__sheet-handle-area {
+  display: none;
 }
 
 .hostel-card__content {
@@ -73,7 +83,6 @@ button {
 
 .hostel-card h2 {
   margin: 0 45px 8px 0;
-
   font-size: 24px;
   line-height: 1.2;
   font-weight: 750;
@@ -81,31 +90,23 @@ button {
 
 .hostel-card__close {
   position: absolute;
-  z-index: 2;
-
+  z-index: 8;
   top: 14px;
   right: 14px;
-
   width: 38px;
   height: 38px;
-
   border: 0;
   border-radius: 50%;
-
   background: #f1f1f1;
   color: #555;
-
   font-size: 26px;
   line-height: 1;
-
   cursor: pointer;
 }
 
 .hostel-card__address {
   margin: 0 0 16px;
-
   color: #555;
-
   font-size: 15px;
   line-height: 1.4;
 }
@@ -115,23 +116,14 @@ button {
    ========================= */
 
 .hostel-card__working {
-  position: relative;
-
   display: flex;
-  flex-direction: row;
   align-items: center;
-
   width: 100%;
   min-height: 64px;
-
   margin: 0 0 14px;
   padding: 12px 14px;
-
   gap: 12px;
-
   border-radius: 14px;
-
-  overflow: hidden;
 }
 
 .hostel-card__working--open {
@@ -146,78 +138,51 @@ button {
 
 .hostel-card__working-icon {
   flex: 0 0 22px;
-
   display: flex;
   align-items: center;
   justify-content: center;
-
   width: 22px;
   height: 22px;
-
   font-size: 18px;
   line-height: 22px;
 }
 
 .hostel-card__working-text {
   flex: 1 1 auto;
-
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
-
   min-width: 0;
-
-  margin: 0;
-  padding: 0;
-
   gap: 3px;
 }
 
 .hostel-card__working-text strong {
   display: block;
-
-  margin: 0;
-  padding: 0;
-
   font-size: 15px;
   line-height: 20px;
   font-weight: 700;
-
-  white-space: normal;
 }
 
 .hostel-card__working-text small {
   display: block;
-
-  margin: 0;
-  padding: 0;
-
   font-size: 13px;
   line-height: 18px;
-  font-weight: 400;
-
   white-space: nowrap;
 }
 
 /* =========================
-   DISTANCE
+   DISTANCE + BEDS
    ========================= */
 
 .hostel-card__distance {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-
   width: 100%;
-
   margin: 0 0 14px;
-  padding: 0;
-
   gap: 5px;
-
   color: #555;
-
   font-size: 15px;
   line-height: 22px;
 }
@@ -227,24 +192,46 @@ button {
   color: #333;
 }
 
-/* =========================
-   BEDS
-   ========================= */
-
 .hostel-card__info {
   display: block;
-
   width: 100%;
-
   margin: 0;
   padding: 14px 16px;
-
   border-radius: 14px;
-
   background: #f6f6f6;
-
   font-size: 15px;
   line-height: 22px;
+}
+
+.hostel-card__booking-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  margin-top: 12px;
+  padding: 13px 14px;
+  border: 1px solid #bbf7d0;
+  border-radius: 14px;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.hostel-card__booking-banner > span {
+  font-size: 20px;
+}
+
+.hostel-card__booking-banner > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hostel-card__booking-banner strong {
+  font-size: 14px;
+}
+
+.hostel-card__booking-banner small {
+  font-size: 12px;
+  line-height: 17px;
 }
 
 /* =========================
@@ -254,15 +241,12 @@ button {
 .hostel-card__metro {
   margin-top: 18px;
   padding: 16px;
-
   border-radius: 18px;
-
   background: #f7f8fa;
 }
 
 .hostel-card__metro-title {
   margin-bottom: 14px;
-
   font-size: 16px;
   line-height: 22px;
   font-weight: 700;
@@ -271,20 +255,17 @@ button {
 .hostel-card__metro-route {
   display: flex;
   flex-direction: column;
-
   gap: 10px;
 }
 
 .hostel-card__metro-point {
   display: flex;
   align-items: flex-start;
-
   gap: 10px;
 }
 
 .hostel-card__metro-point > span {
   flex: 0 0 auto;
-
   font-size: 20px;
   line-height: 24px;
 }
@@ -292,15 +273,12 @@ button {
 .hostel-card__metro-point > div {
   display: flex;
   flex-direction: column;
-
   gap: 2px;
-
   min-width: 0;
 }
 
 .hostel-card__metro-point small {
   color: #777;
-
   font-size: 12px;
   line-height: 17px;
 }
@@ -312,121 +290,98 @@ button {
 
 .hostel-card__metro-point div > span {
   color: #666;
-
   font-size: 12px;
   line-height: 17px;
 }
 
 .hostel-card__metro-arrow {
   margin-left: 6px;
-
   color: #888;
-
   font-size: 18px;
   line-height: 20px;
 }
 
 .hostel-card__metro-walk {
   margin-top: 10px;
-
   color: #666;
-
   font-size: 13px;
   line-height: 19px;
 }
 
 .hostel-card__route-button {
   width: 100%;
-
   margin-top: 14px;
   padding: 11px 14px;
-
   border: 0;
   border-radius: 12px;
-
   background: #2563eb;
   color: #fff;
-
   font-size: 14px;
   font-weight: 650;
-
   cursor: pointer;
 }
 
-.hostel-card__route {
-  margin-top: 12px;
-  padding: 14px;
-
-  border-radius: 14px;
-
-  background: #fff;
-
-  border: 1px solid #e8e8e8;
+.hostel-card__route-button:hover {
+  background: #1d4ed8;
 }
 
-.hostel-card__route-title {
-  margin-bottom: 10px;
-
-  font-size: 14px;
-  line-height: 20px;
-  font-weight: 700;
-}
-
-.hostel-card__route-station {
+.hostel-card__route-status {
   display: flex;
   align-items: flex-start;
-
   gap: 10px;
-
-  padding: 7px 0;
+  margin-top: 12px;
+  padding: 12px 13px;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #1e40af;
 }
 
-.hostel-card__route-station > span {
-  width: 24px;
-  flex: 0 0 24px;
+.hostel-card__route-status > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  border-radius: 50%;
+  background: #2563eb;
+  color: white;
+  font-size: 12px;
+  font-weight: 800;
 }
 
-.hostel-card__route-station > div {
+.hostel-card__route-status > div {
   display: flex;
   flex-direction: column;
-
   gap: 2px;
 }
 
-.hostel-card__route-station strong {
-  font-size: 14px;
-  line-height: 19px;
+.hostel-card__route-status strong {
+  font-size: 13px;
+  line-height: 18px;
 }
 
-.hostel-card__route-station small {
-  color: #777;
-
+.hostel-card__route-status small {
+  color: #3b5ca8;
   font-size: 12px;
   line-height: 17px;
 }
 
 /* =========================
-   DESCRIPTION
+   DESCRIPTION + BUTTONS
    ========================= */
 
 .hostel-card__description {
   margin: 18px 0;
-
   color: #555;
-
   font-size: 14px;
   line-height: 1.5;
 }
 
-/* =========================
-   BUTTONS
-   ========================= */
-
 .hostel-card__buttons {
   display: grid;
-
   grid-template-columns: 1fr 1fr;
-
   gap: 10px;
 }
 
@@ -434,18 +389,14 @@ button {
 .hostel-card__contacts,
 .hostel-card__back {
   min-height: 48px;
-
   border-radius: 14px;
-
   font-size: 15px;
   font-weight: 700;
-
   cursor: pointer;
 }
 
 .hostel-card__book {
   border: 0;
-
   background: #2563eb;
   color: #fff;
 }
@@ -461,13 +412,12 @@ button {
 
 .hostel-card__contacts {
   border: 1px solid #ddd;
-
   background: #fff;
   color: #222;
 }
 
 /* =========================
-   CONTACTS
+   CONTACTS + BOOKING
    ========================= */
 
 .hostel-card__content--contacts {
@@ -478,43 +428,116 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-
   width: 56px;
   height: 56px;
-
   margin-bottom: 16px;
-
   border-radius: 18px;
-
-  background: #f1f1f1;
-
+  background: #eef4ff;
   font-size: 26px;
+}
+
+.hostel-card__details-section {
+  margin-top: 22px;
+}
+
+.hostel-card__details-section h3 {
+  margin: 0 0 10px;
+  color: #333;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.hostel-card__details-card {
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #fafafa;
 }
 
 .hostel-card__contact-item {
   display: flex;
   align-items: center;
-
   gap: 12px;
+  padding: 13px 14px;
+  text-align: left;
+}
 
-  margin-top: 10px;
-  padding: 14px;
+.hostel-card__contact-item + .hostel-card__contact-item {
+  border-top: 1px solid #e8e8e8;
+}
 
-  border-radius: 14px;
+.hostel-card__contact-item > span:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  min-width: 28px;
+  font-size: 19px;
+}
 
-  background: #f6f6f6;
+.hostel-card__contact-item > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
 
+.hostel-card__contact-item small {
+  color: #777;
+  font-size: 11px;
+  line-height: 15px;
+}
+
+.hostel-card__contact-item strong,
+.hostel-card__contact-item a {
+  color: #222;
   font-size: 14px;
-  line-height: 20px;
+  line-height: 19px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.hostel-card__contact-item a {
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.hostel-card__empty-state {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 14px;
+  border-radius: 14px;
+  background: #f6f6f6;
+  color: #555;
+  text-align: left;
+}
+
+.hostel-card__empty-state > span {
+  font-size: 20px;
+}
+
+.hostel-card__empty-state > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.hostel-card__empty-state strong {
+  color: #333;
+  font-size: 13px;
+}
+
+.hostel-card__empty-state small {
+  color: #777;
+  font-size: 12px;
+  line-height: 17px;
 }
 
 .hostel-card__back {
   width: 100%;
-
-  margin-top: 18px;
-
+  margin-top: 22px;
   border: 0;
-
   background: #eee;
   color: #222;
 }
@@ -527,26 +550,16 @@ button {
 .map-error {
   position: fixed;
   z-index: 900;
-
   top: 16px;
   left: 50%;
-
   transform: translateX(-50%);
-
   max-width: calc(100% - 32px);
-
   padding: 10px 16px;
-
   border-radius: 12px;
-
   background: rgba(255, 255, 255, 0.95);
-
-  box-shadow:
-    0 4px 16px rgba(0, 0, 0, 0.12);
-
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   font-size: 14px;
   line-height: 20px;
-
   text-align: center;
 }
 
@@ -555,39 +568,91 @@ button {
 }
 
 /* =========================
-   MOBILE
+   MOBILE BOTTOM SHEET
    ========================= */
 
 @media (max-width: 600px) {
   .hostel-card {
     left: 50%;
-    bottom: 10px;
+    right: auto;
+    top: auto;
+    bottom: 8px;
 
-    width: calc(100% - 16px);
+    width: calc(100% - 12px);
+    height: min(78dvh, 720px);
+    max-height: calc(100dvh - 12px);
 
-    max-height: calc(100dvh - 20px);
+    border-radius: 24px 24px 18px 18px;
 
-    border-radius: 22px;
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  .hostel-card__sheet-handle-area {
+    position: sticky;
+    z-index: 10;
+    top: 0;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 100%;
+    height: 28px;
+    margin: 0;
+
+    background:
+      linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 1) 0%,
+        rgba(255, 255, 255, 0.96) 72%,
+        rgba(255, 255, 255, 0) 100%
+      );
+
+    touch-action: none;
+    cursor: grab;
+  }
+
+  .hostel-card--dragging .hostel-card__sheet-handle-area {
+    cursor: grabbing;
+  }
+
+  .hostel-card__sheet-handle {
+    width: 44px;
+    height: 5px;
+    border-radius: 999px;
+    background: #c7c7cc;
+  }
+
+  .hostel-card__close {
+    position: sticky;
+    float: right;
+    top: 32px;
+    margin: 0 10px -38px 0;
   }
 
   .hostel-card__content {
-    padding: 20px;
+    padding: 16px 18px 22px;
   }
 
-  .hostel-card__content--main {
-    padding-top: 24px;
+  .hostel-card__content--main,
+  .hostel-card__content--contacts {
+    padding-top: 10px;
   }
 
   .hostel-card h2 {
+    margin-right: 46px;
     font-size: 21px;
     line-height: 1.25;
   }
 
   .hostel-card__working {
-    min-height: 64px;
-
-    margin-bottom: 14px;
-    padding: 12px;
+    min-height: 60px;
+    margin-bottom: 12px;
+    padding: 11px 12px;
   }
 
   .hostel-card__working-text strong {
@@ -601,10 +666,18 @@ button {
   }
 
   .hostel-card__distance {
-    margin-bottom: 14px;
-
+    margin-bottom: 12px;
     font-size: 14px;
     line-height: 21px;
+  }
+
+  .hostel-card__metro {
+    margin-top: 14px;
+    padding: 14px;
+  }
+
+  .hostel-card__description {
+    margin: 14px 0;
   }
 
   .hostel-card__buttons {
@@ -614,5 +687,10 @@ button {
   .hostel-card__book,
   .hostel-card__contacts {
     min-height: 50px;
+  }
+
+  .map-status,
+  .map-error {
+    top: 10px;
   }
 }

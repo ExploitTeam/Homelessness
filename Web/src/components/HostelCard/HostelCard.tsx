@@ -1,6 +1,15 @@
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 
 import type { Hostel, UserLocation } from "../../types";
+import type {
+  BookingInfo,
+  ManagerInfo,
+} from "../../api/hostels";
 
 import {
   findMetroRoute,
@@ -16,6 +25,20 @@ interface HostelCardProps {
   onShowRoute: (route: MetroRoute | null) => void;
   booked: boolean;
   onBook: (hostelId: number) => void | Promise<void>;
+}
+
+type HostelWithServerData = Hostel & {
+  managerInfo?: ManagerInfo | null;
+  booking?: BookingInfo | null;
+  homestayType?: number;
+};
+
+interface DragState {
+  active: boolean;
+  startY: number;
+  startOffset: number;
+  currentOffset: number;
+  maxOffset: number;
 }
 
 function getDistance(
@@ -108,6 +131,11 @@ function isCurrentlyOpen(
   const closeMinutes =
     closeHour * 60 + closeMinute;
 
+  // 00:00 — 00:00 обычно означает круглосуточно.
+  if (openMinutes === closeMinutes) {
+    return true;
+  }
+
   if (closeMinutes < openMinutes) {
     return (
       currentMinutes >= openMinutes ||
@@ -121,6 +149,45 @@ function isCurrentlyOpen(
   );
 }
 
+function isMobileViewport(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    window.matchMedia("(max-width: 600px)").matches
+  );
+}
+
+function formatServerDate(value: string): string {
+  if (!value) {
+    return "Не указано";
+  }
+
+  // Сервер присылает ISO без гарантированной timezone.
+  // Не сдвигаем время браузерной таймзоной, а показываем
+  // ровно то локальное время, которое пришло с backend.
+  const match = value.match(
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/
+  );
+
+  if (!match) {
+    return value;
+  }
+
+  const [, year, month, day, hour, minute] = match;
+  return `${day}.${month}.${year} ${hour}:${minute}`;
+}
+
+function getBookingStatus(booking: BookingInfo): string {
+  if (booking.is_approved === 1) {
+    return "Подтверждено";
+  }
+
+  if (booking.is_approved === 0) {
+    return "Ожидает подтверждения";
+  }
+
+  return `Статус: ${booking.is_approved}`;
+}
+
 export default function HostelCard({
   hostel,
   userLocation,
@@ -129,6 +196,16 @@ export default function HostelCard({
   booked,
   onBook,
 }: HostelCardProps) {
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  const dragRef = useRef<DragState>({
+    active: false,
+    startY: 0,
+    startOffset: 0,
+    currentOffset: 0,
+    maxOffset: 0,
+  });
+
   const [showContacts, setShowContacts] =
     useState(false);
 
@@ -138,13 +215,55 @@ export default function HostelCard({
   const [booking, setBooking] =
     useState(false);
 
+  const [sheetOffset, setSheetOffset] =
+    useState(0);
+
+  const [sheetDragging, setSheetDragging] =
+    useState(false);
+
   const [, setCurrentTime] =
     useState(Date.now());
+
+  const hostelData = hostel as HostelWithServerData;
+  const managerInfo = hostelData.managerInfo ?? null;
+  const serverBooking = hostelData.booking ?? null;
+
+  const isBooked = booked || serverBooking !== null;
+
+  const getCollapsedOffset = (): number => {
+    if (!isMobileViewport()) {
+      return 0;
+    }
+
+    const height =
+      cardRef.current?.getBoundingClientRect().height ?? 0;
+
+    // Оставляем сверху примерно 124px панели:
+    // drag-handle, название и начало адреса.
+    return Math.max(0, height - 124);
+  };
+
+  const setSheetPosition = (collapsed: boolean) => {
+    if (!isMobileViewport()) {
+      dragRef.current.currentOffset = 0;
+      setSheetOffset(0);
+      return;
+    }
+
+    const nextOffset = collapsed
+      ? getCollapsedOffset()
+      : 0;
+
+    dragRef.current.currentOffset = nextOffset;
+    setSheetOffset(nextOffset);
+  };
 
   useEffect(() => {
     setShowContacts(false);
     setShowRoute(false);
     setBooking(false);
+    setSheetOffset(0);
+    dragRef.current.currentOffset = 0;
     onShowRoute(null);
   }, [hostel.id, onShowRoute]);
 
@@ -155,6 +274,30 @@ export default function HostelCard({
 
     return () => {
       window.clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (!isMobileViewport()) {
+        dragRef.current.currentOffset = 0;
+        setSheetOffset(0);
+        return;
+      }
+
+      const maxOffset = getCollapsedOffset();
+
+      setSheetOffset((current) => {
+        const next = Math.min(current, maxOffset);
+        dragRef.current.currentOffset = next;
+        return next;
+      });
+    };
+
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
     };
   }, []);
 
@@ -199,7 +342,7 @@ export default function HostelCard({
   );
 
   const handleBook = async () => {
-    if (booking || booked) {
+    if (booking || isBooked) {
       return;
     }
 
@@ -220,18 +363,136 @@ export default function HostelCard({
     if (showRoute) {
       setShowRoute(false);
       onShowRoute(null);
-    } else {
-      setShowRoute(true);
-      onShowRoute(metroRoute);
+      return;
+    }
+
+    setShowRoute(true);
+    onShowRoute(metroRoute);
+
+    // На телефоне сразу опускаем карточку,
+    // чтобы построенный на карте маршрут был виден.
+    if (isMobileViewport()) {
+      if (cardRef.current) {
+        cardRef.current.scrollTop = 0;
+      }
+
+      window.requestAnimationFrame(() => {
+        setSheetPosition(true);
+      });
     }
   };
 
   const handleContacts = () => {
     setShowContacts((current) => !current);
+    setSheetPosition(false);
+
+    if (cardRef.current) {
+      cardRef.current.scrollTop = 0;
+    }
+  };
+
+  const handleSheetPointerDown = (
+    event: ReactPointerEvent<HTMLDivElement>
+  ) => {
+    if (!isMobileViewport()) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const maxOffset = getCollapsedOffset();
+
+    dragRef.current = {
+      active: true,
+      startY: event.clientY,
+      startOffset: sheetOffset,
+      currentOffset: sheetOffset,
+      maxOffset,
+    };
+
+    setSheetDragging(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleSheetPointerMove = (
+    event: ReactPointerEvent<HTMLDivElement>
+  ) => {
+    const state = dragRef.current;
+
+    if (!state.active) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const delta = event.clientY - state.startY;
+    const next = Math.min(
+      state.maxOffset,
+      Math.max(0, state.startOffset + delta)
+    );
+
+    state.currentOffset = next;
+    setSheetOffset(next);
+  };
+
+  const finishSheetDrag = (
+    event: ReactPointerEvent<HTMLDivElement>
+  ) => {
+    const state = dragRef.current;
+
+    if (!state.active) {
+      return;
+    }
+
+    state.active = false;
+    setSheetDragging(false);
+
+    const delta = event.clientY - state.startY;
+
+    // Явный свайп вниз/вверх имеет приоритет.
+    // При маленьком движении выбираем ближайшее положение.
+    const collapse =
+      delta > 42 ||
+      (delta >= -42 &&
+        state.currentOffset > state.maxOffset / 2);
+
+    const nextOffset = collapse
+      ? state.maxOffset
+      : 0;
+
+    state.currentOffset = nextOffset;
+    setSheetOffset(nextOffset);
+
+    try {
+      event.currentTarget.releasePointerCapture(
+        event.pointerId
+      );
+    } catch {
+      // Pointer capture мог уже освободиться браузером.
+    }
   };
 
   return (
-    <div className="hostel-card">
+    <div
+      ref={cardRef}
+      className={`hostel-card ${
+        sheetDragging ? "hostel-card--dragging" : ""
+      }`}
+      style={{
+        transform: `translateX(-50%) translateY(${sheetOffset}px)`,
+      }}
+    >
+      <div
+        className="hostel-card__sheet-handle-area"
+        onPointerDown={handleSheetPointerDown}
+        onPointerMove={handleSheetPointerMove}
+        onPointerUp={finishSheetDrag}
+        onPointerCancel={finishSheetDrag}
+        aria-label="Потяните вниз, чтобы свернуть карточку, или вверх, чтобы открыть"
+      >
+        <span className="hostel-card__sheet-handle" />
+      </div>
+
       <button
         type="button"
         className="hostel-card__close"
@@ -279,25 +540,34 @@ export default function HostelCard({
 
           <div className="hostel-card__distance">
             <span>🚶</span>
-
             <span>Расстояние:</span>
-
             <strong>
               {distance < 1
-                ? `${Math.round(
-                    distance * 1000
-                  )} м`
+                ? `${Math.round(distance * 1000)} м`
                 : `${distance.toFixed(1)} км`}
             </strong>
           </div>
 
           <div className="hostel-card__info">
             🛏 Свободных мест:{" "}
-            <strong>
-              {hostel.bedsAvailable}
-            </strong>{" "}
+            <strong>{hostel.bedsAvailable}</strong>{" "}
             из {hostel.bedsTotal}
           </div>
+
+          {serverBooking && (
+            <div className="hostel-card__booking-banner">
+              <span>🎫</span>
+              <div>
+                <strong>У вас есть бронирование</strong>
+                <small>
+                  {getBookingStatus(serverBooking)} ·{" "}
+                  {formatServerDate(
+                    serverBooking.date_time
+                  )}
+                </small>
+              </div>
+            </div>
+          )}
 
           <div className="hostel-card__metro">
             <div className="hostel-card__metro-title">
@@ -313,9 +583,7 @@ export default function HostelCard({
                     Ближайшая станция к вам
                   </small>
 
-                  <strong>
-                    {userMetro.name}
-                  </strong>
+                  <strong>{userMetro.name}</strong>
 
                   <span>
                     {userMetro.lines.join(" / ")}
@@ -335,9 +603,7 @@ export default function HostelCard({
                     Ближайшая к ночлежке
                   </small>
 
-                  <strong>
-                    {nearestMetro.name}
-                  </strong>
+                  <strong>{nearestMetro.name}</strong>
 
                   <span>
                     {nearestMetro.lines.join(" / ")}
@@ -363,59 +629,34 @@ export default function HostelCard({
                 onClick={handleRoute}
               >
                 {showRoute
-                  ? "✕ Скрыть маршрут"
-                  : "🚇 Показать маршрут"}
+                  ? "✕ Скрыть маршрут с карты"
+                  : "🚇 Показать маршрут на карте"}
               </button>
             )}
 
             {showRoute && metroRoute && (
-              <div className="hostel-card__route">
-                <div className="hostel-card__route-title">
-                  🚇 Маршрут метро
+              <div className="hostel-card__route-status">
+                <span>✓</span>
+                <div>
+                  <strong>
+                    Маршрут отображается на карте
+                  </strong>
+                  <small>
+                    {metroRoute.durationMinutes > 0 &&
+                      `≈ ${metroRoute.durationMinutes} мин`}
+                    {metroRoute.durationMinutes > 0 &&
+                      metroRoute.transferCount > 0 &&
+                      " · "}
+                    {metroRoute.transferCount > 0 &&
+                      `${metroRoute.transferCount} ${
+                        metroRoute.transferCount === 1
+                          ? "пересадка"
+                          : metroRoute.transferCount < 5
+                            ? "пересадки"
+                            : "пересадок"
+                      }`}
+                  </small>
                 </div>
-
-                {metroRoute.stations.map(
-                  (station, index) => {
-                    const first =
-                      index === 0;
-
-                    const last =
-                      index ===
-                      metroRoute.stations.length - 1;
-
-                    const transfer =
-                      station.lines.length > 1;
-
-                    return (
-                      <div
-                        className="hostel-card__route-station"
-                        key={`${station.id}-${index}`}
-                      >
-                        <span>
-                          {first
-                            ? "📍"
-                            : last
-                              ? "🏠"
-                              : transfer
-                                ? "🔄"
-                                : "🚇"}
-                        </span>
-
-                        <div>
-                          <strong>
-                            {station.name}
-                          </strong>
-
-                          <small>
-                            {station.lines.join(
-                              " / "
-                            )}
-                          </small>
-                        </div>
-                      </div>
-                    );
-                  }
-                )}
               </div>
             )}
           </div>
@@ -429,20 +670,20 @@ export default function HostelCard({
             <button
               type="button"
               className={`hostel-card__book ${
-                booked
+                isBooked
                   ? "hostel-card__book--success"
                   : ""
               }`}
               onClick={handleBook}
               disabled={
                 booking ||
-                booked ||
+                isBooked ||
                 hostel.bedsAvailable <= 0
               }
             >
               {booking
                 ? "Бронируем..."
-                : booked
+                : isBooked
                   ? "Забронировано ✓"
                   : hostel.bedsAvailable <= 0
                     ? "Мест нет"
@@ -454,7 +695,7 @@ export default function HostelCard({
               className="hostel-card__contacts"
               onClick={handleContacts}
             >
-              ☎ Контакты
+              ☎ Контакты и бронь
             </button>
           </div>
         </div>
@@ -464,35 +705,104 @@ export default function HostelCard({
             ☎
           </div>
 
-          <h2>
-            Контактная информация
-          </h2>
+          <h2>Контакты и бронирование</h2>
 
-          {hostel.phone || hostel.email ? (
-            <>
-              {hostel.phone && (
+          <section className="hostel-card__details-section">
+            <h3>Менеджер пункта</h3>
+
+            {managerInfo ? (
+              <div className="hostel-card__details-card">
+                <div className="hostel-card__contact-item">
+                  <span>👤</span>
+                  <div>
+                    <small>Имя</small>
+                    <strong>
+                      {managerInfo.username ||
+                        "Не указано"}
+                    </strong>
+                  </div>
+                </div>
+
                 <div className="hostel-card__contact-item">
                   <span>📞</span>
-                  <span>{hostel.phone}</span>
+                  <div>
+                    <small>Телефон</small>
+                    {managerInfo.phone_number ? (
+                      <a
+                        href={`tel:${managerInfo.phone_number}`}
+                      >
+                        {managerInfo.phone_number}
+                      </a>
+                    ) : (
+                      <strong>Не указан</strong>
+                    )}
+                  </div>
                 </div>
-              )}
+              </div>
+            ) : (
+              <div className="hostel-card__empty-state">
+                <span>ℹ️</span>
+                <div>
+                  <strong>
+                    Менеджер пока не назначен
+                  </strong>
+                  <small>
+                    Сервер вернул пустой manager_info.
+                  </small>
+                </div>
+              </div>
+            )}
+          </section>
 
-              {hostel.email && (
+          <section className="hostel-card__details-section">
+            <h3>Ваше бронирование</h3>
+
+            {serverBooking ? (
+              <div className="hostel-card__details-card">
                 <div className="hostel-card__contact-item">
-                  <span>✉️</span>
-                  <span>{hostel.email}</span>
+                  <span>🎫</span>
+                  <div>
+                    <small>Статус</small>
+                    <strong>
+                      {getBookingStatus(serverBooking)}
+                    </strong>
+                  </div>
                 </div>
-              )}
-            </>
-          ) : (
-            <div className="hostel-card__contact-item">
-              <span>ℹ️</span>
 
-              <span>
-                Контактные данные пока не указаны.
-              </span>
-            </div>
-          )}
+                <div className="hostel-card__contact-item">
+                  <span>🕐</span>
+                  <div>
+                    <small>Дата бронирования</small>
+                    <strong>
+                      {formatServerDate(
+                        serverBooking.date_time
+                      )}
+                    </strong>
+                  </div>
+                </div>
+
+                <div className="hostel-card__contact-item">
+                  <span>№</span>
+                  <div>
+                    <small>Номер бронирования</small>
+                    <strong>{serverBooking.id}</strong>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="hostel-card__empty-state">
+                <span>ℹ️</span>
+                <div>
+                  <strong>
+                    Бронирования этого пункта нет
+                  </strong>
+                  <small>
+                    Сервер вернул пустой booking.
+                  </small>
+                </div>
+              </div>
+            )}
+          </section>
 
           <button
             type="button"

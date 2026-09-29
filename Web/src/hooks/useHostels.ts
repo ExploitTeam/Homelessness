@@ -1,16 +1,52 @@
 import { useEffect, useState } from "react";
 
-import { getHostels } from "../api/hostels";
+import {
+  getHostels,
+  type BackendPlace,
+  type BookingInfo,
+  type ManagerInfo,
+} from "../api/hostels";
 import type { Hostel } from "../types";
 
+export type HostelWithApiData = Hostel & {
+  managerInfo: ManagerInfo | null;
+  booking: BookingInfo | null;
+  homestayType: number;
+};
+
 interface UseHostelsResult {
-  hostels: Hostel[];
+  hostels: HostelWithApiData[];
   loading: boolean;
   error: string | null;
 }
 
+function hasManagerInfo(
+  value: BackendPlace["manager_info"]
+): value is ManagerInfo {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "id" in value &&
+    "username" in value &&
+    "phone_number" in value
+  );
+}
+
+function hasBookingInfo(
+  value: BackendPlace["booking"]
+): value is BookingInfo {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "id" in value &&
+    "user_id" in value &&
+    "homestay_id" in value &&
+    "date_time" in value
+  );
+}
+
 export function useHostels(): UseHostelsResult {
-  const [hostels, setHostels] = useState<Hostel[]>([]);
+  const [hostels, setHostels] = useState<HostelWithApiData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,47 +64,59 @@ export function useHostels(): UseHostelsResult {
           return;
         }
 
-        const mappedHostels: Hostel[] = data
+        const mappedHostels = data
           .filter(
             (place) =>
               place.latitude !== null &&
               place.longtitude !== null
           )
-          .map((place) => ({
-            id: place.id,
+          .map((place): HostelWithApiData => {
+            const managerInfo = hasManagerInfo(
+              place.manager_info
+            )
+              ? place.manager_info
+              : null;
 
-            lat: place.latitude as number,
-            lng: place.longtitude as number,
+            const booking = hasBookingInfo(place.booking)
+              ? place.booking
+              : null;
 
-            name:
-              place.address ||
-              `Пункт №${place.id}`,
+            return {
+              id: place.id,
 
-            address:
-              place.address ||
-              "Адрес не указан",
+              lat: place.latitude as number,
+              lng: place.longtitude as number,
 
-            bedsAvailable:
-              place.available_beds,
+              name:
+                place.address ||
+                `Пункт №${place.id}`,
 
-            bedsTotal:
-              place.all_beds,
+              address:
+                place.address ||
+                "Адрес не указан",
 
-            openTime:
-              place.open_time,
+              bedsAvailable: place.available_beds,
+              bedsTotal: place.all_beds,
 
-            closeTime:
-              place.close_time,
+              openTime: place.open_time,
+              closeTime: place.close_time,
 
-            isWorking:
-              Boolean(place.is_working),
+              isWorking: Boolean(place.is_working),
 
-            description:
-              place.additional_info ?? "",
+              description:
+                place.additional_info ?? "",
 
-            phone: "",
-            email: "",
-          }));
+              // Оставляем старые поля для совместимости
+              // с остальными компонентами проекта.
+              phone: managerInfo?.phone_number ?? "",
+              email: "",
+
+              // Реальные данные из /api/places.
+              managerInfo,
+              booking,
+              homestayType: place.homestay_type,
+            };
+          });
 
         setHostels(mappedHostels);
       } catch (err) {
