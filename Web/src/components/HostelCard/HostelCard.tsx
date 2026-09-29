@@ -41,30 +41,24 @@ interface DragState {
   maxOffset: number;
 }
 
-function getDistance(
-  userLocation: UserLocation,
-  hostel: Hostel
+function getDistanceKm(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number
 ): number {
   const R = 6371;
 
-  const lat1 =
-    (userLocation.lat * Math.PI) / 180;
+  const lat1Rad = (lat1 * Math.PI) / 180;
+  const lat2Rad = (lat2 * Math.PI) / 180;
 
-  const lat2 =
-    (hostel.lat * Math.PI) / 180;
-
-  const dLat =
-    ((hostel.lat - userLocation.lat) * Math.PI) /
-    180;
-
-  const dLng =
-    ((hostel.lng - userLocation.lng) * Math.PI) /
-    180;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
 
   const a =
     Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) *
-      Math.cos(lat2) *
+    Math.cos(lat1Rad) *
+      Math.cos(lat2Rad) *
       Math.sin(dLng / 2) ** 2;
 
   const c =
@@ -308,9 +302,11 @@ export default function HostelCard({
       hostel.closeTime
     );
 
-  const distance = getDistance(
-    userLocation,
-    hostel
+  const distance = getDistanceKm(
+    userLocation.lat,
+    userLocation.lng,
+    hostel.lat,
+    hostel.lng
   );
 
   const nearestMetro = getNearestMetro(
@@ -323,23 +319,45 @@ export default function HostelCard({
     userLocation.lng
   );
 
-  const metroRoute = findMetroRoute(
-    userMetro,
-    nearestMetro
+  const userToMetroDistance = getDistanceKm(
+    userLocation.lat,
+    userLocation.lng,
+    userMetro.lat,
+    userMetro.lng
   );
 
-  const userMetroWalkingTime =
-    getWalkingTime(
-      userLocation.lat,
-      userLocation.lng,
-      userMetro
-    );
-
-  const walkingTime = getWalkingTime(
+  const hostelToMetroDistance = getDistanceKm(
     hostel.lat,
     hostel.lng,
-    nearestMetro
+    nearestMetro.lat,
+    nearestMetro.lng
   );
+
+  // Не пытаемся строить маршрут Московского метро для тестовых
+  // пунктов в Петербурге, Омске, Краснодаре и других городах.
+  const metroAvailable =
+    userToMetroDistance <= 20 &&
+    hostelToMetroDistance <= 20;
+
+  const metroRoute = metroAvailable
+    ? findMetroRoute(userMetro, nearestMetro)
+    : null;
+
+  const userMetroWalkingTime = metroAvailable
+    ? getWalkingTime(
+        userLocation.lat,
+        userLocation.lng,
+        userMetro
+      )
+    : 0;
+
+  const walkingTime = metroAvailable
+    ? getWalkingTime(
+        hostel.lat,
+        hostel.lng,
+        nearestMetro
+      )
+    : 0;
 
   const handleBook = async () => {
     if (booking || isBooked) {
@@ -574,90 +592,105 @@ export default function HostelCard({
               🚇 Как добраться на метро
             </div>
 
-            <div className="hostel-card__metro-route">
-              <div className="hostel-card__metro-point">
-                <span>📍</span>
-
+            {!metroAvailable ? (
+              <div className="hostel-card__metro-unavailable">
+                <span>ℹ️</span>
                 <div>
+                  <strong>Маршрут метро недоступен</strong>
                   <small>
-                    Ближайшая станция к вам
-                  </small>
-
-                  <strong>{userMetro.name}</strong>
-
-                  <span>
-                    {userMetro.lines.join(" / ")}
-                  </span>
-                </div>
-              </div>
-
-              <div className="hostel-card__metro-arrow">
-                ↓
-              </div>
-
-              <div className="hostel-card__metro-point">
-                <span>🏠</span>
-
-                <div>
-                  <small>
-                    Ближайшая к ночлежке
-                  </small>
-
-                  <strong>{nearestMetro.name}</strong>
-
-                  <span>
-                    {nearestMetro.lines.join(" / ")}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="hostel-card__metro-walk">
-              🚶 До станции от вас примерно{" "}
-              {userMetroWalkingTime} мин
-            </div>
-
-            <div className="hostel-card__metro-walk">
-              🚶 От станции до ночлежки примерно{" "}
-              {walkingTime} мин
-            </div>
-
-            {metroRoute && (
-              <button
-                type="button"
-                className="hostel-card__route-button"
-                onClick={handleRoute}
-              >
-                {showRoute
-                  ? "✕ Скрыть маршрут с карты"
-                  : "🚇 Показать маршрут на карте"}
-              </button>
-            )}
-
-            {showRoute && metroRoute && (
-              <div className="hostel-card__route-status">
-                <span>✓</span>
-                <div>
-                  <strong>
-                    Маршрут отображается на карте
-                  </strong>
-                  <small>
-                    {metroRoute.durationMinutes > 0 &&
-                      `≈ ${metroRoute.durationMinutes} мин`}
-                    {metroRoute.durationMinutes > 0 &&
-                      metroRoute.transferCount > 0 &&
-                      " · "}
-                    {metroRoute.transferCount > 0 &&
-                      `${metroRoute.transferCount} ${
-                        metroRoute.transferCount === 1
-                          ? "пересадка"
-                          : metroRoute.transferCount < 5
-                            ? "пересадки"
-                            : "пересадок"
-                      }`}
+                    Этот пункт или ваше текущее местоположение находятся
+                    далеко от Московского метро.
                   </small>
                 </div>
               </div>
+            ) : (
+              <>
+              <div className="hostel-card__metro-route">
+                <div className="hostel-card__metro-point">
+                  <span>📍</span>
+
+                  <div>
+                    <small>
+                      Ближайшая станция к вам
+                    </small>
+
+                    <strong>{userMetro.name}</strong>
+
+                    <span>
+                      {userMetro.lines.join(" / ")}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="hostel-card__metro-arrow">
+                  ↓
+                </div>
+
+                <div className="hostel-card__metro-point">
+                  <span>🏠</span>
+
+                  <div>
+                    <small>
+                      Ближайшая к ночлежке
+                    </small>
+
+                    <strong>{nearestMetro.name}</strong>
+
+                    <span>
+                      {nearestMetro.lines.join(" / ")}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="hostel-card__metro-walk">
+                🚶 До станции от вас примерно{" "}
+                {userMetroWalkingTime} мин
+              </div>
+
+              <div className="hostel-card__metro-walk">
+                🚶 От станции до ночлежки примерно{" "}
+                {walkingTime} мин
+              </div>
+
+              {metroRoute && (
+                <button
+                  type="button"
+                  className="hostel-card__route-button"
+                  onClick={handleRoute}
+                >
+                  {showRoute
+                    ? "✕ Скрыть маршрут с карты"
+                    : "🚇 Показать маршрут на карте"}
+                </button>
+              )}
+
+              {showRoute && metroRoute && (
+                <div className="hostel-card__route-status">
+                  <span>✓</span>
+                  <div>
+                    <strong>
+                      Маршрут отображается на карте
+                    </strong>
+                    <small>
+                      {metroRoute.durationMinutes > 0 &&
+                        `≈ ${metroRoute.durationMinutes} мин`}
+                      {metroRoute.durationMinutes > 0 &&
+                        metroRoute.transferCount > 0 &&
+                        " · "}
+                      {metroRoute.transferCount > 0 &&
+                        `${metroRoute.transferCount} ${
+                          metroRoute.transferCount === 1
+                            ? "пересадка"
+                            : metroRoute.transferCount < 5
+                              ? "пересадки"
+                              : "пересадок"
+                        }`}
+                    </small>
+                  </div>
+                </div>
+              )}
+              </>
             )}
           </div>
 
@@ -747,7 +780,7 @@ export default function HostelCard({
                     Менеджер пока не назначен
                   </strong>
                   <small>
-                    Сервер вернул пустой manager_info.
+                    Контактные данные менеджера пока не указаны.
                   </small>
                 </div>
               </div>
@@ -797,7 +830,7 @@ export default function HostelCard({
                     Бронирования этого пункта нет
                   </strong>
                   <small>
-                    Сервер вернул пустой booking.
+                    Вы ещё не бронировали место в этом пункте.
                   </small>
                 </div>
               </div>

@@ -12,24 +12,55 @@ body,
 }
 
 body {
-  font-family: Arial, sans-serif;
+  margin: 0;
   overflow: hidden;
   background: #f5f5f5;
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Arial,
+    sans-serif;
+}
+
+button {
+  font: inherit;
 }
 
 .app {
   position: relative;
   width: 100%;
   height: 100dvh;
+  overflow: hidden;
 }
 
 /* =========================
    КАРТА
    ========================= */
 
-.map {
+.map-shell {
+  position: relative;
   width: 100%;
   height: 100dvh;
+  overflow: hidden;
+  background: #e5e7eb;
+}
+
+.map {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Карта должна принимать жесты, а React-overlay выше неё — только
+   в тех местах, где действительно есть элементы интерфейса. */
+.maplibregl-map,
+.maplibregl-canvas-container,
+.maplibregl-canvas {
+  width: 100%;
+  height: 100%;
 }
 
 /* =========================
@@ -39,132 +70,172 @@ body {
 .user-marker {
   width: 20px;
   height: 20px;
-  background: #2563eb;
   border: 4px solid white;
   border-radius: 50%;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
-}
-
-/* =========================
-   НОЧЛЕЖКА
-   ========================= */
-
-.hostel-marker {
-  width: 42px;
-  height: 42px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: white;
-  border: 2px solid #222;
-  border-radius: 50%;
-  cursor: pointer;
-  font-size: 21px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
-  transition: transform 0.15s ease;
-}
-
-.hostel-marker:hover {
-  transform: scale(1.15);
-}
-
-/* =========================
-   КНОПКА МЕТРО НА КАРТЕ
-   ========================= */
-
-.metro-toggle {
-  position: absolute;
-  top: 70px;
-  left: 14px;
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: 12px;
-  background: white;
-  font-size: 22px;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
-  z-index: 20;
-  transition:
-    transform 0.15s ease,
-    background 0.15s ease;
-}
-
-.metro-toggle:hover {
-  transform: scale(1.05);
-}
-
-.metro-toggle:active {
-  transform: scale(0.95);
-}
-
-/* =========================
-   СТАНЦИИ МЕТРО
-   ========================= */
-
-.metro-station-marker {
-  width: 12px;
-  height: 12px;
-  border: 2px solid white;
-  border-radius: 50%;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.metro-route-marker {
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: white;
-  border: 2px solid #2563eb;
-  border-radius: 50%;
-  font-size: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  background: #2563eb;
+  box-shadow:
+    0 0 0 2px rgba(37, 99, 235, 0.2),
+    0 2px 9px rgba(0, 0, 0, 0.35);
   pointer-events: none;
 }
 
 /* =========================
-   МЕТРО ЛИНИИ / BADGES
+   ПУНКТ РАЗМЕЩЕНИЯ
    ========================= */
 
-.metro-line-list {
+.hostel-marker {
+  appearance: none;
+  -webkit-appearance: none;
+
   display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 5px;
-}
-
-.metro-line-badge {
-  display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 7px;
-  border: 1px solid;
-  border-radius: 999px;
-  background: white;
-  font-size: 11px;
-  font-weight: 600;
+  justify-content: center;
+
+  width: 42px;
+  height: 42px;
+  margin: 0;
+  padding: 0;
+
+  border: 3px solid #fff;
+  border-radius: 50%;
+
+  color: #fff;
+  font-size: 21px;
+  line-height: 1;
+
+  cursor: pointer;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+
+  box-shadow:
+    0 2px 9px rgba(0, 0, 0, 0.34),
+    0 0 0 1px rgba(0, 0, 0, 0.08);
+
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
-.metro-line-dot {
-  width: 8px;
-  height: 8px;
+.hostel-marker:hover,
+.hostel-marker:focus-visible {
+  transform: scale(1.12);
+  outline: none;
+  box-shadow:
+    0 5px 16px rgba(0, 0, 0, 0.36),
+    0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+
+.hostel-marker:active {
+  transform: scale(0.96);
+}
+
+.hostel-marker--selected {
+  transform: scale(1.12);
+  box-shadow:
+    0 5px 18px rgba(0, 0, 0, 0.38),
+    0 0 0 4px rgba(37, 99, 235, 0.35);
+}
+
+/* =========================
+   МЕТРО
+   ========================= */
+
+.metro-station-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 13px;
+  height: 13px;
+
+  border: 2px solid white;
   border-radius: 50%;
-  flex-shrink: 0;
+
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.42);
+  pointer-events: none;
+}
+
+.metro-route-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 30px;
+  height: 30px;
+
+  border: 3px solid white;
+  border-radius: 50%;
+
+  background: #111827;
+  color: white;
+
+  font-size: 12px;
+  font-weight: 800;
+
+  box-shadow: 0 2px 9px rgba(0, 0, 0, 0.32);
+  pointer-events: none;
+}
+
+/* =========================
+   КНОПКИ КАРТЫ
+   ========================= */
+
+.map-control {
+  position: absolute;
+  left: 16px;
+  z-index: 40;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 48px;
+  height: 48px;
+  padding: 0;
+
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 14px;
+
+  background: rgba(255, 255, 255, 0.96);
+  color: #111827;
+
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(10px);
+
+  font-size: 23px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.map-control:hover {
+  background: #fff;
+}
+
+.map-control:active {
+  transform: scale(0.96);
+}
+
+.map-control--active {
+  background: #111827;
+  color: #fff;
+}
+
+.map-control--active:hover {
+  background: #1f2937;
+}
+
+.map-control--locate {
+  top: 72px;
+}
+
+.map-control--metro {
+  top: 128px;
 }
 
 @media (max-width: 600px) {
   .hostel-marker {
-    width: 38px;
-    height: 38px;
+    width: 40px;
+    height: 40px;
     font-size: 19px;
   }
 
@@ -173,17 +244,24 @@ body {
     height: 18px;
   }
 
-  .metro-toggle {
-    top: 60px;
-    left: 10px;
-    width: 42px;
-    height: 42px;
-    border-radius: 11px;
-    font-size: 20px;
-  }
-
   .metro-station-marker {
     width: 11px;
     height: 11px;
+  }
+
+  .map-control {
+    left: 10px;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    font-size: 21px;
+  }
+
+  .map-control--locate {
+    top: 60px;
+  }
+
+  .map-control--metro {
+    top: 112px;
   }
 }

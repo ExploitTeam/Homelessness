@@ -1,10 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import {
+  AttributionControl,
   Map as MapLibreMap,
   Marker,
   NavigationControl,
-  AttributionControl,
   setWorkerUrl,
 } from "maplibre-gl";
 
@@ -15,25 +20,22 @@ import type {
   UserLocation,
 } from "../../types";
 
-import type {
-  MetroRoute,
-} from "../../utils/metro";
+import type { MetroRoute } from "../../utils/metro";
 
 import {
+  getMetroLinePaths,
   metroLines,
+  metroStations,
 } from "../../data/metroData";
 
-setWorkerUrl(
-  "/maplibre/maplibre-gl-worker.mjs"
-);
+setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
 
 interface MoscowMapProps {
   hostels: Hostel[];
   userLocation: UserLocation;
-  onHostelClick: (
-    hostel: Hostel
-  ) => void;
+  onHostelClick: (hostel: Hostel) => void;
   route: MetroRoute | null;
+  selectedHostel?: Hostel | null;
 }
 
 interface MetroStationView {
@@ -43,1047 +45,743 @@ interface MetroStationView {
   colors: string[];
 }
 
+const METRO_LAYER_IDS = [
+  "metro-network-line",
+  "metro-network-double-a",
+  "metro-network-double-b",
+] as const;
+
+const ROUTE_SOURCE_ID = "selected-metro-route";
+const ROUTE_HALO_LAYER_ID = "selected-metro-route-halo";
+const ROUTE_LAYER_ID = "selected-metro-route-line";
+const TRANSFER_SOURCE_ID = "selected-metro-transfers";
+const TRANSFER_HALO_LAYER_ID = "selected-metro-transfer-halo";
+const TRANSFER_LAYER_ID = "selected-metro-transfer-line";
+
+function removeMarkers(markers: Marker[]) {
+  markers.forEach((marker) => marker.remove());
+  markers.length = 0;
+}
+
+function isMobileViewport() {
+  return (
+    typeof window !== "undefined" &&
+    window.matchMedia("(max-width: 600px)").matches
+  );
+}
+
 export default function MoscowMap({
   hostels,
   userLocation,
   onHostelClick,
   route,
+  selectedHostel = null,
 }: MoscowMapProps) {
-  const mapContainer =
-    useRef<HTMLDivElement | null>(null);
+  const mapContainer = useRef<HTMLDivElement | null>(null);
+  const map = useRef<MapLibreMap | null>(null);
 
-  const map =
-    useRef<MapLibreMap | null>(null);
+  const hostelMarkers = useRef<Marker[]>([]);
+  const routeMarkers = useRef<Marker[]>([]);
+  const metroMarkers = useRef<Marker[]>([]);
 
-  const markers =
-    useRef<Marker[]>([]);
+  const [metroVisible, setMetroVisible] = useState(false);
+  const metroVisibleRef = useRef(false);
 
-  const metroMarkers =
-    useRef<Marker[]>([]);
+  const applyMetroVisibility = useCallback(
+    (visible: boolean) => {
+      metroVisibleRef.current = visible;
+      setMetroVisible(visible);
 
-  const [metroVisible, setMetroVisible] =
-    useState(false);
+      const mapInstance = map.current;
 
-  const metroVisibleRef =
-    useRef(false);
+      if (!mapInstance) {
+        return;
+      }
 
-  const applyMetroVisibility = (
-    visible: boolean
-  ) => {
-    metroVisibleRef.current = visible;
-    setMetroVisible(visible);
+      for (const layerId of METRO_LAYER_IDS) {
+        if (mapInstance.getLayer(layerId)) {
+          mapInstance.setLayoutProperty(
+            layerId,
+            "visibility",
+            visible ? "visible" : "none"
+          );
+        }
+      }
 
+      metroMarkers.current.forEach((marker) => {
+        marker.getElement().style.display = visible
+          ? "flex"
+          : "none";
+      });
+    },
+    []
+  );
+
+  /*
+   * =====================================
+   * СОЗДАНИЕ КАРТЫ + СЕТЬ МЕТРО
+   * =====================================
+   */
+  useEffect(() => {
+    if (!mapContainer.current || map.current) {
+      return;
+    }
+
+    const newMap = new MapLibreMap({
+      container: mapContainer.current,
+      center: [37.6173, 55.7558],
+      zoom: 11,
+      style: {
+        version: 8,
+        sources: {
+          osm: {
+            type: "raster",
+            tiles: [
+              "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+            ],
+            tileSize: 256,
+            attribution: "© OpenStreetMap contributors",
+          },
+        },
+        layers: [
+          {
+            id: "osm",
+            type: "raster",
+            source: "osm",
+          },
+        ],
+      },
+    });
+
+    map.current = newMap;
+
+    newMap.addControl(
+      new NavigationControl({ showCompass: false }),
+      "top-right"
+    );
+
+    newMap.addControl(
+      new AttributionControl({ compact: true }),
+      "bottom-right"
+    );
+
+    const handleLoad = () => {
+      if (newMap.getSource("metro-network")) {
+        return;
+      }
+
+      const features = metroLines.flatMap((line) =>
+        getMetroLinePaths(line)
+          .filter((path) => path.length >= 2)
+          .map((path) => ({
+            type: "Feature" as const,
+            properties: {
+              color: line.color,
+              name: line.name,
+              lineId: line.id,
+              render: line.render ?? "solid",
+            },
+            geometry: {
+              type: "LineString" as const,
+              coordinates: path.map(
+                ([, lat, lng]) => [lng, lat]
+              ),
+            },
+          }))
+      );
+
+      newMap.addSource("metro-network", {
+        type: "geojson",
+        data: {
+          type: "FeatureCollection",
+          features,
+        },
+      });
+
+      // Обычные линии метро.
+      newMap.addLayer({
+        id: "metro-network-line",
+        type: "line",
+        source: "metro-network",
+        filter: ["!=", ["get", "render"], "double"],
+        layout: {
+          visibility: "none",
+          "line-cap": "round",
+          "line-join": "round",
+        },
+        paint: {
+          "line-color": ["get", "color"],
+          "line-width": 4.5,
+          "line-opacity": 0.9,
+        },
+      });
+
+      // МЦК отображаем двумя параллельными красными линиями.
+      for (const [id, offset] of [
+        ["metro-network-double-a", -2.2],
+        ["metro-network-double-b", 2.2],
+      ] as const) {
+        newMap.addLayer({
+          id,
+          type: "line",
+          source: "metro-network",
+          filter: ["==", ["get", "render"], "double"],
+          layout: {
+            visibility: "none",
+            "line-cap": "round",
+            "line-join": "round",
+          },
+          paint: {
+            "line-color": ["get", "color"],
+            "line-width": 2.4,
+            "line-offset": offset,
+            "line-opacity": 0.92,
+          },
+        });
+      }
+
+      const stationMap = new globalThis.Map<
+        string,
+        MetroStationView
+      >();
+
+      for (const station of metroStations) {
+        if (
+          !Number.isFinite(station.lat) ||
+          !Number.isFinite(station.lng)
+        ) {
+          continue;
+        }
+
+        const key = `${station.name}_${station.lat.toFixed(
+          5
+        )}_${station.lng.toFixed(5)}`;
+
+        const existing = stationMap.get(key);
+
+        if (existing) {
+          if (!existing.colors.includes(station.color)) {
+            existing.colors.push(station.color);
+          }
+          continue;
+        }
+
+        stationMap.set(key, {
+          name: station.name,
+          lat: station.lat,
+          lng: station.lng,
+          colors: [station.color],
+        });
+      }
+
+      stationMap.forEach((station) => {
+        const element = document.createElement("div");
+        element.className = "metro-station-marker";
+        element.title = station.name;
+
+        // Станции — только визуальный слой. Они не должны
+        // перехватывать нажатия по пунктам размещения.
+        element.style.pointerEvents = "none";
+        element.style.display = metroVisibleRef.current
+          ? "flex"
+          : "none";
+
+        if (station.colors.length === 1) {
+          element.style.background = station.colors[0];
+        } else {
+          const sectors = station.colors.map(
+            (color, index) => {
+              const start =
+                (index / station.colors.length) * 100;
+              const end =
+                ((index + 1) / station.colors.length) * 100;
+              return `${color} ${start}% ${end}%`;
+            }
+          );
+
+          element.style.background = `conic-gradient(${sectors.join(
+            ", "
+          )})`;
+        }
+
+        const marker = new Marker({
+          element,
+          anchor: "center",
+        })
+          .setLngLat([station.lng, station.lat])
+          .addTo(newMap);
+
+        metroMarkers.current.push(marker);
+      });
+
+      applyMetroVisibility(metroVisibleRef.current);
+    };
+
+    newMap.on("load", handleLoad);
+
+    return () => {
+      newMap.off("load", handleLoad);
+
+      removeMarkers(metroMarkers.current);
+      removeMarkers(hostelMarkers.current);
+      removeMarkers(routeMarkers.current);
+
+      newMap.remove();
+      map.current = null;
+    };
+  }, [applyMetroVisibility]);
+
+  /*
+   * =====================================
+   * ПОЛЬЗОВАТЕЛЬ + ПУНКТЫ
+   * =====================================
+   */
+  useEffect(() => {
     const mapInstance = map.current;
 
     if (!mapInstance) {
       return;
     }
 
-    if (
-      mapInstance.getLayer(
-        "metro-network-line"
-      )
-    ) {
-      mapInstance.setLayoutProperty(
-        "metro-network-line",
-        "visibility",
-        visible
-          ? "visible"
-          : "none"
-      );
-    }
+    removeMarkers(hostelMarkers.current);
 
-    metroMarkers.current.forEach(
-      (marker) => {
-        marker
-          .getElement()
-          .style.display = visible
-          ? "flex"
-          : "none";
-      }
-    );
-  };
+    const userElement = document.createElement("div");
+    userElement.className = "user-marker";
+    userElement.title = "Ваше местоположение";
+    userElement.style.pointerEvents = "none";
 
-  /*
-   * =====================================
-   * СОЗДАНИЕ КАРТЫ
-   * =====================================
-   */
+    const userMarker = new Marker({
+      element: userElement,
+      anchor: "center",
+    })
+      .setLngLat([userLocation.lng, userLocation.lat])
+      .addTo(mapInstance);
 
-  useEffect(() => {
-    if (!mapContainer.current) {
-      return;
-    }
+    hostelMarkers.current.push(userMarker);
 
-    if (map.current) {
-      return;
-    }
-
-    const newMap =
-      new MapLibreMap({
-        container:
-          mapContainer.current,
-
-        center: [
-          37.6173,
-          55.7558,
-        ],
-
-        zoom: 11,
-
-        style: {
-          version: 8,
-
-          sources: {
-            osm: {
-              type: "raster",
-
-              tiles: [
-                "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-              ],
-
-              tileSize: 256,
-
-              attribution:
-                "© OpenStreetMap contributors",
-            },
-          },
-
-          layers: [
-            {
-              id: "osm",
-              type: "raster",
-              source: "osm",
-            },
-          ],
-        },
-      });
-
-    map.current = newMap;
-
-    newMap.addControl(
-      new NavigationControl(),
-      "top-right"
-    );
-
-    newMap.addControl(
-      new AttributionControl(),
-      "bottom-right"
-    );
-
-    /*
-     * =====================================
-     * МЕТРО
-     * =====================================
-     */
-
-    newMap.on("load", () => {
+    for (const hostel of hostels) {
       if (
-        newMap.getSource(
-          "metro-network"
-        )
-      ) {
-        return;
-      }
-
-      const features =
-        metroLines
-          .filter(
-            (line) =>
-              Array.isArray(
-                line.stations
-              ) &&
-              line.stations.length >= 2
-          )
-          .map((line) => ({
-            type: "Feature" as const,
-
-            properties: {
-              color: line.color,
-              name: line.name,
-            },
-
-            geometry: {
-              type: "LineString" as const,
-
-              coordinates:
-                line.stations.map(
-                  (station) => [
-                    station[2],
-                    station[1],
-                  ] as [
-                    number,
-                    number
-                  ]
-                ),
-            },
-          }));
-
-      newMap.addSource(
-        "metro-network",
-        {
-          type: "geojson",
-
-          data: {
-            type: "FeatureCollection",
-            features,
-          },
-        }
-      );
-
-      newMap.addLayer({
-        id: "metro-network-line",
-
-        type: "line",
-
-        source:
-          "metro-network",
-
-        layout: {
-          visibility: "none",
-        },
-
-        paint: {
-          "line-color": [
-            "get",
-            "color",
-          ],
-
-          "line-width": 4,
-
-          "line-opacity": 0.9,
-        },
-      });
-
-      /*
-       * =====================================
-       * СОБИРАЕМ СТАНЦИИ
-       * =====================================
-       */
-
-      const stationMap =
-        new globalThis.Map<
-          string,
-          MetroStationView
-        >();
-
-      for (
-        const line of metroLines
-      ) {
-        for (
-          const station of line.stations
-        ) {
-          const name =
-            station[0];
-
-          const lat =
-            station[1];
-
-          const lng =
-            station[2];
-
-          if (
-            typeof lat !== "number" ||
-            typeof lng !== "number" ||
-            !Number.isFinite(lat) ||
-            !Number.isFinite(lng)
-          ) {
-            continue;
-          }
-
-          const key =
-            `${name}_${lat.toFixed(
-              5
-            )}_${lng.toFixed(5)}`;
-
-          const existing =
-            stationMap.get(key);
-
-          if (existing) {
-            if (
-              !existing.colors.includes(
-                line.color
-              )
-            ) {
-              existing.colors.push(
-                line.color
-              );
-            }
-          } else {
-            stationMap.set(
-              key,
-              {
-                name,
-                lat,
-                lng,
-                colors: [
-                  line.color,
-                ],
-              }
-            );
-          }
-        }
-      }
-
-      /*
-       * =====================================
-       * МАРКЕРЫ СТАНЦИЙ
-       * =====================================
-       */
-
-      stationMap.forEach(
-        (
-          station
-        ) => {
-          const element =
-            document.createElement(
-              "div"
-            );
-
-          element.className =
-            "metro-station-marker";
-
-          element.style.width =
-            "14px";
-
-          element.style.height =
-            "14px";
-
-          element.style.borderRadius =
-            "50%";
-
-          element.style.border =
-            "2px solid white";
-
-          element.style.boxSizing =
-            "border-box";
-
-          element.style.cursor =
-            "pointer";
-
-          element.style.display =
-            metroVisibleRef.current
-              ? "flex"
-              : "none";
-
-          element.style.boxShadow =
-            "0 1px 5px rgba(0,0,0,0.35)";
-
-          /*
-           * Станция одной линии
-           */
-
-          if (
-            station.colors.length ===
-            1
-          ) {
-            element.style.background =
-              station.colors[0];
-          } else {
-            /*
-             * Пересадочная станция
-             */
-
-            const sectors =
-              station.colors.map(
-                (
-                  color,
-                  index
-                ) => {
-                  const start =
-                    (index /
-                      station.colors
-                        .length) *
-                    100;
-
-                  const end =
-                    ((index + 1) /
-                      station.colors
-                        .length) *
-                    100;
-
-                  return `${color} ${start}% ${end}%`;
-                }
-              );
-
-            element.style.background =
-              `conic-gradient(${sectors.join(
-                ", "
-              )})`;
-          }
-
-          element.title =
-            station.name;
-
-          const marker =
-            new Marker({
-              element,
-              anchor:
-                "center",
-            })
-              .setLngLat([
-                station.lng,
-                station.lat,
-              ])
-              .addTo(newMap);
-
-          metroMarkers.current.push(
-            marker
-          );
-        }
-      );
-
-      /*
-       * Применяем текущее состояние метро
-       */
-
-      applyMetroVisibility(
-        metroVisibleRef.current
-      );
-    });
-
-    return () => {
-      metroMarkers.current.forEach(
-        (marker) => {
-          marker.remove();
-        }
-      );
-
-      markers.current.forEach(
-        (marker) => {
-          marker.remove();
-        }
-      );
-
-      metroMarkers.current = [];
-      markers.current = [];
-
-      newMap.remove();
-
-      map.current = null;
-    };
-  }, []);
-
-  /*
-   * =====================================
-   * МАРКЕРЫ ПОЛЬЗОВАТЕЛЯ И НОЧЛЕЖЕК
-   * =====================================
-   */
-
-  useEffect(() => {
-    if (!map.current) {
-      return;
-    }
-
-    markers.current.forEach(
-      (marker) => {
-        marker.remove();
-      }
-    );
-
-    markers.current = [];
-
-    /*
-     * Пользователь
-     */
-
-    const userElement =
-      document.createElement(
-        "div"
-      );
-
-    userElement.style.width =
-      "18px";
-
-    userElement.style.height =
-      "18px";
-
-    userElement.style.borderRadius =
-      "50%";
-
-    userElement.style.background =
-      "#2563eb";
-
-    userElement.style.border =
-      "4px solid white";
-
-    userElement.style.boxSizing =
-      "border-box";
-
-    userElement.style.boxShadow =
-      "0 2px 10px rgba(0,0,0,0.35)";
-
-    const userMarker =
-      new Marker({
-        element:
-          userElement,
-        anchor:
-          "center",
-      })
-        .setLngLat([
-          userLocation.lng,
-          userLocation.lat,
-        ])
-        .addTo(map.current);
-
-    markers.current.push(
-      userMarker
-    );
-
-    /*
-     * Ночлежки
-     */
-
-    for (
-      const hostel of hostels
-    ) {
-      if (
-        !Number.isFinite(
-          hostel.lat
-        ) ||
-        !Number.isFinite(
-          hostel.lng
-        )
+        !Number.isFinite(hostel.lat) ||
+        !Number.isFinite(hostel.lng)
       ) {
         continue;
       }
 
-      const element =
-        document.createElement(
-          "button"
-        );
-
-      element.type =
-        "button";
-
-      element.style.width =
-        "38px";
-
-      element.style.height =
-        "38px";
-
-      element.style.borderRadius =
-        "50%";
-
-      element.style.border =
-        "3px solid white";
-
-      element.style.background =
-        hostel.isWorking
-          ? "#ef4444"
-          : "#6b7280";
-
-      element.style.boxShadow =
-        "0 2px 10px rgba(0,0,0,0.35)";
-
-      element.style.cursor =
-        "pointer";
-
-      element.style.color =
-        "white";
-
-      element.style.fontSize =
-        "18px";
-
-      element.style.display =
-        "flex";
-
-      element.style.alignItems =
-        "center";
-
-      element.style.justifyContent =
-        "center";
-
-      element.innerText =
-        "⌂";
-
-      element.title =
-        hostel.name;
-
-      element.addEventListener(
-        "click",
-        () => {
-          onHostelClick(
-            hostel
-          );
-        }
+      const element = document.createElement("button");
+      element.type = "button";
+      element.className = "hostel-marker";
+      element.dataset.hostelId = String(hostel.id);
+      element.title = hostel.name;
+      element.setAttribute(
+        "aria-label",
+        `Открыть пункт: ${hostel.name}`
       );
 
-      const marker =
-        new Marker({
-          element,
-          anchor:
-            "center",
-        })
-          .setLngLat([
-            hostel.lng,
-            hostel.lat,
-          ])
-          .addTo(
-            map.current
-          );
+      element.textContent = "⌂";
+      element.style.background = hostel.isWorking
+        ? "#ef4444"
+        : "#6b7280";
+      element.style.pointerEvents = "auto";
+      element.style.touchAction = "manipulation";
 
-      markers.current.push(
-        marker
-      );
-    }
-
-    /*
-     * Станции выбранного маршрута
-     */
-
-    if (route) {
-      for (
-        const station of route.stations
-      ) {
-        const element =
-          document.createElement(
-            "div"
-          );
-
-        element.style.width =
-          "28px";
-
-        element.style.height =
-          "28px";
-
-        element.style.borderRadius =
-          "50%";
-
-        element.style.background =
-          "#111827";
-
-        element.style.border =
-          "3px solid white";
-
-        element.style.boxShadow =
-          "0 2px 8px rgba(0,0,0,0.3)";
-
-        element.style.display =
-          "flex";
-
-        element.style.alignItems =
-          "center";
-
-        element.style.justifyContent =
-          "center";
-
-        element.style.color =
-          "white";
-
-        element.style.fontSize =
-          "14px";
-
-        element.innerText =
-          "🚇";
-
-        element.title =
-          station.name;
-
-        const marker =
-          new Marker({
-            element,
-            anchor:
-              "center",
-          })
-            .setLngLat([
-              station.lng,
-              station.lat,
-            ])
-            .addTo(
-              map.current
-            );
-
-        markers.current.push(
-          marker
-        );
+      if (selectedHostel?.id === hostel.id) {
+        element.classList.add("hostel-marker--selected");
       }
+
+      const stopMapGesture = (event: Event) => {
+        event.stopPropagation();
+      };
+
+      const handleClick = (event: MouseEvent) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onHostelClick(hostel);
+      };
+
+      element.addEventListener("pointerdown", stopMapGesture);
+      element.addEventListener("click", handleClick);
+
+      const marker = new Marker({
+        element,
+        anchor: "center",
+      })
+        .setLngLat([hostel.lng, hostel.lat])
+        .addTo(mapInstance);
+
+      hostelMarkers.current.push(marker);
     }
+
+    return () => {
+      removeMarkers(hostelMarkers.current);
+    };
   }, [
     hostels,
-    userLocation,
     onHostelClick,
-    route,
+    selectedHostel?.id,
+    userLocation.lat,
+    userLocation.lng,
   ]);
 
   /*
    * =====================================
-   * ЛИНИЯ ВЫБРАННОГО МАРШРУТА
+   * МАРКЕРЫ ВЫБРАННОГО МАРШРУТА
    * =====================================
    */
-
   useEffect(() => {
-    if (!map.current) {
+    const mapInstance = map.current;
+
+    if (!mapInstance) {
       return;
     }
 
-    const mapInstance =
-      map.current;
+    removeMarkers(routeMarkers.current);
 
-    const sourceId =
-      "selected-metro-route";
-
-    const layerId =
-      "selected-metro-route-line";
-
-    const drawRoute =
-      () => {
-        /*
-         * Удаляем старую линию
-         */
-
-        if (
-          mapInstance.getLayer(
-            layerId
-          )
-        ) {
-          mapInstance.removeLayer(
-            layerId
-          );
-        }
-
-        if (
-          mapInstance.getSource(
-            sourceId
-          )
-        ) {
-          mapInstance.removeSource(
-            sourceId
-          );
-        }
-
-        /*
-         * Если маршрута нет —
-         * ничего не рисуем
-         */
-
-        if (
-          !route ||
-          route.stations.length < 2
-        ) {
-          return;
-        }
-
-        const coordinates =
-          route.stations.map(
-            (station) => [
-              station.lng,
-              station.lat,
-            ] as [
-              number,
-              number
-            ]
-          );
-
-        /*
-         * Добавляем GeoJSON
-         */
-
-        mapInstance.addSource(
-          sourceId,
-          {
-            type: "geojson",
-
-            data: {
-              type: "Feature",
-
-              properties: {},
-
-              geometry: {
-                type: "LineString",
-
-                coordinates,
-              },
-            },
-          }
-        );
-
-        /*
-         * Добавляем линию маршрута
-         */
-
-        mapInstance.addLayer({
-          id: layerId,
-
-          type: "line",
-
-          source: sourceId,
-
-          paint: {
-            "line-color":
-              "#2563eb",
-
-            "line-width": 7,
-
-            "line-opacity": 0.95,
-          },
-        });
-      };
-
-    if (
-      mapInstance.isStyleLoaded()
-    ) {
-      drawRoute();
-    } else {
-      mapInstance.once(
-        "load",
-        drawRoute
-      );
+    if (!route || route.stations.length === 0) {
+      return;
     }
 
+    const importantStations = new globalThis.Map<
+      string,
+      { station: MetroRoute["stations"][number]; icon: string }
+    >();
+
+    const first = route.stations[0];
+    const last = route.stations[route.stations.length - 1];
+
+    for (const transfer of route.transfers) {
+      importantStations.set(transfer.from.id, {
+        station: transfer.from,
+        icon: "↻",
+      });
+      importantStations.set(transfer.to.id, {
+        station: transfer.to,
+        icon: "↻",
+      });
+    }
+
+    // A/B должны оставаться видимыми даже если старт/финиш
+    // одновременно являются пересадочными платформами.
+    importantStations.set(first.id, {
+      station: first,
+      icon: "A",
+    });
+
+    importantStations.set(last.id, {
+      station: last,
+      icon: first.id === last.id ? "A" : "B",
+    });
+
+    importantStations.forEach(({ station, icon }) => {
+      const element = document.createElement("div");
+      element.className = "metro-route-marker";
+      element.textContent = icon;
+      element.title = station.name;
+      element.style.pointerEvents = "none";
+
+      const marker = new Marker({
+        element,
+        anchor: "center",
+      })
+        .setLngLat([station.lng, station.lat])
+        .addTo(mapInstance);
+
+      routeMarkers.current.push(marker);
+    });
+
     return () => {
-      if (
-        mapInstance.getLayer(
-          layerId
-        )
-      ) {
-        mapInstance.removeLayer(
-          layerId
-        );
+      removeMarkers(routeMarkers.current);
+    };
+  }, [route]);
+
+  /*
+   * =====================================
+   * ОТРИСОВКА ВЫБРАННОГО МАРШРУТА
+   * =====================================
+   */
+  useEffect(() => {
+    const mapInstance = map.current;
+
+    if (!mapInstance) {
+      return;
+    }
+
+    const removeRouteLayers = () => {
+      for (const layerId of [
+        TRANSFER_LAYER_ID,
+        TRANSFER_HALO_LAYER_ID,
+        ROUTE_LAYER_ID,
+        ROUTE_HALO_LAYER_ID,
+      ]) {
+        if (mapInstance.getLayer(layerId)) {
+          mapInstance.removeLayer(layerId);
+        }
+      }
+
+      for (const sourceId of [
+        TRANSFER_SOURCE_ID,
+        ROUTE_SOURCE_ID,
+      ]) {
+        if (mapInstance.getSource(sourceId)) {
+          mapInstance.removeSource(sourceId);
+        }
+      }
+    };
+
+    const fitRoute = () => {
+      if (!route || route.stations.length === 0) {
+        return;
+      }
+
+      if (route.stations.length === 1) {
+        const station = route.stations[0];
+        mapInstance.flyTo({
+          center: [station.lng, station.lat],
+          zoom: 14,
+          duration: 700,
+          essential: true,
+        });
+        return;
+      }
+
+      let minLng = Infinity;
+      let minLat = Infinity;
+      let maxLng = -Infinity;
+      let maxLat = -Infinity;
+
+      for (const station of route.stations) {
+        minLng = Math.min(minLng, station.lng);
+        minLat = Math.min(minLat, station.lat);
+        maxLng = Math.max(maxLng, station.lng);
+        maxLat = Math.max(maxLat, station.lat);
       }
 
       if (
-        mapInstance.getSource(
-          sourceId
-        )
+        Math.abs(maxLng - minLng) < 0.00001 &&
+        Math.abs(maxLat - minLat) < 0.00001
       ) {
-        mapInstance.removeSource(
-          sourceId
-        );
+        mapInstance.flyTo({
+          center: [minLng, minLat],
+          zoom: 14,
+          duration: 700,
+          essential: true,
+        });
+        return;
+      }
+
+      mapInstance.fitBounds(
+        [
+          [minLng, minLat],
+          [maxLng, maxLat],
+        ],
+        {
+          padding: isMobileViewport()
+            ? { top: 72, right: 34, bottom: 165, left: 34 }
+            : { top: 80, right: 70, bottom: 210, left: 70 },
+          maxZoom: 14,
+          duration: 800,
+          essential: true,
+        }
+      );
+    };
+
+    const drawRoute = () => {
+      removeRouteLayers();
+
+      if (!route || route.stations.length === 0) {
+        return;
+      }
+
+      const rideFeatures = route.segments
+        .filter((segment) => segment.stations.length >= 2)
+        .map((segment) => ({
+          type: "Feature" as const,
+          properties: {
+            color: segment.color,
+            lineId: segment.lineId,
+            line: segment.line,
+          },
+          geometry: {
+            type: "LineString" as const,
+            coordinates: segment.stations.map((station) => [
+              station.lng,
+              station.lat,
+            ]),
+          },
+        }));
+
+      if (rideFeatures.length > 0) {
+        mapInstance.addSource(ROUTE_SOURCE_ID, {
+          type: "geojson",
+          data: {
+            type: "FeatureCollection",
+            features: rideFeatures,
+          },
+        });
+
+        // Белый halo отделяет маршрут от OSM и остальных линий.
+        mapInstance.addLayer({
+          id: ROUTE_HALO_LAYER_ID,
+          type: "line",
+          source: ROUTE_SOURCE_ID,
+          layout: {
+            "line-cap": "round",
+            "line-join": "round",
+          },
+          paint: {
+            "line-color": "#ffffff",
+            "line-width": 11,
+            "line-opacity": 0.95,
+          },
+        });
+
+        mapInstance.addLayer({
+          id: ROUTE_LAYER_ID,
+          type: "line",
+          source: ROUTE_SOURCE_ID,
+          layout: {
+            "line-cap": "round",
+            "line-join": "round",
+          },
+          paint: {
+            "line-color": ["get", "color"],
+            "line-width": 7,
+            "line-opacity": 1,
+          },
+        });
+      }
+
+      const transferFeatures = route.transfers.map(
+        (transfer) => ({
+          type: "Feature" as const,
+          properties: {
+            minutes: transfer.minutes,
+          },
+          geometry: {
+            type: "LineString" as const,
+            coordinates: [
+              [transfer.from.lng, transfer.from.lat],
+              [transfer.to.lng, transfer.to.lat],
+            ],
+          },
+        })
+      );
+
+      if (transferFeatures.length > 0) {
+        mapInstance.addSource(TRANSFER_SOURCE_ID, {
+          type: "geojson",
+          data: {
+            type: "FeatureCollection",
+            features: transferFeatures,
+          },
+        });
+
+        mapInstance.addLayer({
+          id: TRANSFER_HALO_LAYER_ID,
+          type: "line",
+          source: TRANSFER_SOURCE_ID,
+          layout: {
+            "line-cap": "round",
+            "line-join": "round",
+          },
+          paint: {
+            "line-color": "#ffffff",
+            "line-width": 8,
+            "line-opacity": 0.95,
+          },
+        });
+
+        mapInstance.addLayer({
+          id: TRANSFER_LAYER_ID,
+          type: "line",
+          source: TRANSFER_SOURCE_ID,
+          layout: {
+            "line-cap": "round",
+            "line-join": "round",
+          },
+          paint: {
+            "line-color": "#374151",
+            "line-width": 4,
+            "line-opacity": 0.95,
+            "line-dasharray": [1.2, 1.2],
+          },
+        });
+      }
+
+      fitRoute();
+    };
+
+    if (mapInstance.isStyleLoaded()) {
+      drawRoute();
+    } else {
+      mapInstance.once("load", drawRoute);
+    }
+
+    return () => {
+      mapInstance.off("load", drawRoute);
+
+      try {
+        removeRouteLayers();
+      } catch {
+        // Карта уже могла быть уничтожена при размонтировании.
       }
     };
   }, [route]);
 
   /*
    * =====================================
-   * ПОКАЗ / СКРЫТИЕ МЕТРО
+   * ПОКАЗ / СКРЫТИЕ ПОЛНОЙ СЕТИ МЕТРО
    * =====================================
    */
-
   useEffect(() => {
+    applyMetroVisibility(metroVisible);
+  }, [applyMetroVisibility, metroVisible]);
+
+  const handleLocateUser = () => {
     if (!map.current) {
       return;
     }
 
-    const mapInstance =
-      map.current;
+    map.current.flyTo({
+      center: [userLocation.lng, userLocation.lat],
+      zoom: 14,
+      duration: 800,
+      essential: true,
+    });
+  };
 
-    const updateVisibility =
-      () => {
-        if (
-          mapInstance.getLayer(
-            "metro-network-line"
-          )
-        ) {
-          mapInstance.setLayoutProperty(
-            "metro-network-line",
-            "visibility",
-            metroVisible
-              ? "visible"
-              : "none"
-          );
-        }
-
-        metroMarkers.current.forEach(
-          (marker) => {
-            marker
-              .getElement()
-              .style.display =
-              metroVisible
-                ? "flex"
-                : "none";
-          }
-        );
-      };
-
-    if (
-      mapInstance.isStyleLoaded()
-    ) {
-      updateVisibility();
-    } else {
-      mapInstance.once(
-        "load",
-        updateVisibility
-      );
-    }
-  }, [metroVisible]);
-
-  /*
-   * =====================================
-   * ПЕРЕЙТИ К ПОЛЬЗОВАТЕЛЮ
-   * =====================================
-   */
-
-  const handleLocateUser =
-    () => {
-      if (!map.current) {
-        return;
-      }
-
-      map.current.flyTo({
-        center: [
-          userLocation.lng,
-          userLocation.lat,
-        ],
-
-        zoom: 14,
-
-        duration: 1000,
-
-        essential: true,
-      });
-    };
-
-  /*
-   * =====================================
-   * КНОПКА МЕТРО
-   * =====================================
-   */
-
-  const handleMetroToggle =
-    () => {
-      applyMetroVisibility(
-        !metroVisibleRef.current
-      );
-    };
+  const handleMetroToggle = () => {
+    applyMetroVisibility(!metroVisibleRef.current);
+  };
 
   return (
-    <div
-      style={{
-        position:
-          "relative",
-
-        width: "100%",
-
-        height: "100dvh",
-      }}
-    >
+    <div className="map-shell">
       <div
         ref={mapContainer}
         className="map"
-        style={{
-          width: "100%",
-          height: "100%",
-        }}
       />
-
-      /*
-       * Кнопка местоположения
-       */
 
       <button
         type="button"
-        onClick={
-          handleLocateUser
-        }
+        className="map-control map-control--locate"
+        onClick={handleLocateUser}
         title="Моё местоположение"
         aria-label="Моё местоположение"
-        style={{
-          position:
-            "absolute",
-
-          top: "72px",
-
-          left: "16px",
-
-          zIndex: 10,
-
-          width: "48px",
-
-          height: "48px",
-
-          border: "none",
-
-          borderRadius:
-            "14px",
-
-          background:
-            "rgba(255,255,255,0.96)",
-
-          boxShadow:
-            "0 3px 12px rgba(0,0,0,0.2)",
-
-          fontSize: "24px",
-
-          cursor:
-            "pointer",
-
-          display: "flex",
-
-          alignItems:
-            "center",
-
-          justifyContent:
-            "center",
-        }}
       >
         📍
       </button>
 
-      /*
-       * Кнопка метро
-       */
-
       <button
         type="button"
-        onClick={
-          handleMetroToggle
-        }
+        className={`map-control map-control--metro ${
+          metroVisible ? "map-control--active" : ""
+        }`}
+        onClick={handleMetroToggle}
         title={
-          metroVisible
-            ? "Скрыть метро"
-            : "Показать метро"
+          metroVisible ? "Скрыть метро" : "Показать метро"
         }
         aria-label={
-          metroVisible
-            ? "Скрыть метро"
-            : "Показать метро"
+          metroVisible ? "Скрыть метро" : "Показать метро"
         }
-        style={{
-          position:
-            "absolute",
-
-          top: "128px",
-
-          left: "16px",
-
-          zIndex: 10,
-
-          width: "48px",
-
-          height: "48px",
-
-          border: "none",
-
-          borderRadius:
-            "14px",
-
-          background:
-            metroVisible
-              ? "#111827"
-              : "rgba(255,255,255,0.96)",
-
-          color:
-            metroVisible
-              ? "#ffffff"
-              : "#111827",
-
-          boxShadow:
-            "0 3px 12px rgba(0,0,0,0.2)",
-
-          fontSize: "24px",
-
-          cursor:
-            "pointer",
-
-          display: "flex",
-
-          alignItems:
-            "center",
-
-          justifyContent:
-            "center",
-        }}
       >
         🚇
       </button>

@@ -1,5 +1,13 @@
-import { useCallback, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
+
+import "./App.css";
 
 import {
   getMaxUser,
@@ -21,8 +29,8 @@ type BookingMessage = {
 };
 
 function App() {
-  const [selectedHostel, setSelectedHostel] =
-    useState<Hostel | null>(null);
+  const [selectedHostelId, setSelectedHostelId] =
+    useState<number | null>(null);
 
   const [metroRoute, setMetroRoute] =
     useState<MetroRoute | null>(null);
@@ -33,54 +41,96 @@ function App() {
   const [bookingMessage, setBookingMessage] =
     useState<BookingMessage | null>(null);
 
+  const bookingMessageTimerRef =
+    useRef<number | null>(null);
+
   const { location } = useUserLocation();
-
-  console.log("MAX:", isRunningInsideMax());
-  console.log("MAX user:", getMaxUser());
-  console.log(
-    "MAX initData:",
-    window.WebApp?.initData
-  );
-
   const mapLocation = location ?? mockUserLocation;
 
   const {
     hostels,
     loading: hostelsLoading,
     error: hostelsError,
+    reload: reloadHostels,
   } = useHostels();
 
-  const handleHostelClick = useCallback(
-    (hostel: Hostel) => {
-      setSelectedHostel(hostel);
-      setMetroRoute(null);
-      setBookingMessage(null);
+  const selectedHostel = useMemo(
+    () =>
+      selectedHostelId === null
+        ? null
+        : hostels.find(
+            (hostel) => hostel.id === selectedHostelId
+          ) ?? null,
+    [hostels, selectedHostelId]
+  );
+
+  useEffect(() => {
+    console.log("MAX:", isRunningInsideMax());
+    console.log("MAX user:", getMaxUser());
+    console.log("MAX initData:", window.WebApp?.initData);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (bookingMessageTimerRef.current !== null) {
+        window.clearTimeout(
+          bookingMessageTimerRef.current
+        );
+      }
+    };
+  }, []);
+
+  const showBookingMessage = useCallback(
+    (message: BookingMessage, duration = 5000) => {
+      if (bookingMessageTimerRef.current !== null) {
+        window.clearTimeout(
+          bookingMessageTimerRef.current
+        );
+      }
+
+      setBookingMessage(message);
+
+      bookingMessageTimerRef.current =
+        window.setTimeout(() => {
+          setBookingMessage(null);
+          bookingMessageTimerRef.current = null;
+        }, duration);
     },
     []
   );
 
-  const handleCloseCard = useCallback(() => {
-    setSelectedHostel(null);
-    setMetroRoute(null);
+  const clearBookingMessage = useCallback(() => {
+    if (bookingMessageTimerRef.current !== null) {
+      window.clearTimeout(
+        bookingMessageTimerRef.current
+      );
+      bookingMessageTimerRef.current = null;
+    }
+
     setBookingMessage(null);
   }, []);
 
+  const handleHostelClick = useCallback(
+    (hostel: Hostel) => {
+      setSelectedHostelId(hostel.id);
+      setMetroRoute(null);
+      clearBookingMessage();
+    },
+    [clearBookingMessage]
+  );
+
+  const handleCloseCard = useCallback(() => {
+    setSelectedHostelId(null);
+    setMetroRoute(null);
+    clearBookingMessage();
+  }, [clearBookingMessage]);
+
   const handleBook = useCallback(
     async (hostelId: number) => {
-      /*
-       * Не проверяем здесь bookedHostelIds.
-       *
-       * Сервер должен быть источником истины.
-       * Если пользователь уже забронировал эту ночлежку,
-       * сервер вернет 409, и мы покажем понятную ошибку.
-       */
-
-      setBookingMessage(null);
+      clearBookingMessage();
 
       try {
-        const result = await bookHostel({
-          hostelId,
-        });
+        const result = await bookHostel({ hostelId });
 
         if (!result.success) {
           throw new Error(
@@ -88,44 +138,44 @@ function App() {
           );
         }
 
-        setBookedHostelIds((current) => {
-          if (current.includes(hostelId)) {
-            return current;
-          }
+        setBookedHostelIds((current) =>
+          current.includes(hostelId)
+            ? current
+            : [...current, hostelId]
+        );
 
-          return [...current, hostelId];
-        });
-
-        setBookingMessage({
+        showBookingMessage({
           type: "success",
           text: "Место успешно забронировано!",
         });
 
-        console.log("Бронь создана:", result);
-
-        setTimeout(() => {
-          setBookingMessage(null);
-        }, 5000);
+        /*
+         * /api/places — источник истины для количества мест,
+         * manager_info и booking. После успешной брони сразу
+         * перечитываем пункты, поэтому вкладка "Контакты и бронь"
+         * обновляется без перезагрузки страницы.
+         */
+        try {
+          await reloadHostels();
+        } catch (reloadError) {
+          console.error(
+            "Не удалось обновить список после бронирования:",
+            reloadError
+          );
+        }
       } catch (error) {
-        console.error(
-          "Ошибка бронирования:",
-          error
-        );
+        console.error("Ошибка бронирования:", error);
 
-        setBookingMessage({
+        showBookingMessage({
           type: "error",
           text:
             error instanceof Error
               ? error.message
               : "Не удалось забронировать место. Попробуйте ещё раз.",
         });
-
-        setTimeout(() => {
-          setBookingMessage(null);
-        }, 5000);
       }
     },
-    []
+    [clearBookingMessage, reloadHostels, showBookingMessage]
   );
 
   return (
@@ -135,11 +185,12 @@ function App() {
         userLocation={mapLocation}
         onHostelClick={handleHostelClick}
         route={metroRoute}
+        selectedHostel={selectedHostel}
       />
 
-      {hostelsLoading && (
+      {hostelsLoading && hostels.length === 0 && (
         <div className="map-status">
-          Загружаем ночлежки...
+          Загружаем пункты...
         </div>
       )}
 
@@ -166,117 +217,41 @@ function App() {
       {bookingMessage &&
         createPortal(
           <div
-            role="dialog"
-            aria-modal="true"
+            role="alertdialog"
             aria-live="assertive"
-            style={{
-              position: "fixed",
-
-              // Занимаем весь экран
-              inset: 0,
-
-              // Максимальный z-index, чтобы уведомление
-              // было поверх карты, карточки и других элементов
-              zIndex: 2147483647,
-
-              // Центрирование
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-
-              padding: "16px",
-              boxSizing: "border-box",
-
-              // Затемняем интерфейс под сообщением
-              background: "rgba(0, 0, 0, 0.32)",
-            }}
+            className="booking-notice-overlay"
+            onClick={clearBookingMessage}
           >
             <div
-              style={{
-                width: "100%",
-                maxWidth: "420px",
-                boxSizing: "border-box",
-
-                padding: "20px",
-
-                borderRadius: "18px",
-
-                background:
-                  bookingMessage.type === "success"
-                    ? "#16a34a"
-                    : "#dc2626",
-
-                color: "#ffffff",
-
-                boxShadow:
-                  "0 18px 60px rgba(0, 0, 0, 0.45)",
-
-                display: "flex",
-                alignItems: "flex-start",
-                gap: "14px",
-
-                fontFamily: "inherit",
-              }}
+              className={`booking-notice booking-notice--${bookingMessage.type}`}
+              onClick={(event) => event.stopPropagation()}
             >
-              {/* Иконка */}
-              <div
-                style={{
-                  width: "40px",
-                  height: "40px",
-                  minWidth: "40px",
-
-                  borderRadius: "50%",
-
-                  background:
-                    "rgba(255, 255, 255, 0.2)",
-
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-
-                  fontSize: "21px",
-                  fontWeight: 700,
-                }}
-              >
+              <div className="booking-notice__icon">
                 {bookingMessage.type === "success"
                   ? "✓"
                   : "!"}
               </div>
 
-              {/* Текст */}
-              <div
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "16px",
-                    fontWeight: 700,
-                    marginBottom: "6px",
-                    lineHeight: 1.3,
-                  }}
-                >
+              <div className="booking-notice__body">
+                <div className="booking-notice__title">
                   {bookingMessage.type === "success"
                     ? "Бронирование успешно"
                     : "Не удалось забронировать"}
                 </div>
 
-                <div
-                  style={{
-                    fontSize: "14px",
-                    lineHeight: 1.5,
-                    fontWeight: 400,
-                    opacity: 0.95,
-
-                    // На случай длинного ответа
-                    overflowWrap: "break-word",
-                  }}
-                >
+                <div className="booking-notice__text">
                   {bookingMessage.text}
                 </div>
               </div>
+
+              <button
+                type="button"
+                className="booking-notice__close"
+                onClick={clearBookingMessage}
+                aria-label="Закрыть уведомление"
+              >
+                ×
+              </button>
             </div>
           </div>,
           document.body
