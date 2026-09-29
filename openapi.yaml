@@ -1,0 +1,499 @@
+openapi: 3.1.0
+info:
+  title: HOMELESSNESS API
+  version: 0.1.0
+paths:
+  /api/auth:
+    post:
+      summary: Auth Mini App
+      description: Точка входа. Сюда фронтенд отправляет initData при запуске приложения.
+      operationId: auth_mini_app_api_auth_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthRequest'
+        required: true
+      responses:
+        '200':
+          description: JWT успешно создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+              example:
+                access_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                token_type: bearer
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '400':
+          description: Некорректный initData, отсутствует hash или невозможно получить user_id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidInitData:
+                  value:
+                    detail: Invalid initData format
+                missingHash:
+                  value:
+                    detail: Missing hash in initData
+                badUser:
+                  value:
+                    detail: Could not parse user_id from initData
+        '401':
+          description: Hash initData не прошёл проверку
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: 'Authentication failed: Hash mismatch'
+  /api/places:
+    get:
+      summary: Info
+      description: 'Защищенный эндпоинт. Доступен только с валидным JWT-токеном. Заголовки запроса от фронта: Authorization:
+        Bearer'
+      operationId: info_api_places_get
+      responses:
+        '200':
+          description: Список пунктов размещения для авторизованного пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlacesResponse'
+              example:
+                user_id: 456383042
+                places:
+                - id: 4
+                  address: Москва, Фрязевская, 10Б
+                  all_beds: 30
+                  available_beds: 30
+                  open_time: '21:30'
+                  close_time: '22:15'
+                  is_working: 1
+                  additional_info: Новый пункт, добавленный вручную.
+                  homestay_type: 4
+                  longtitude: 37.8302216
+                  latitude: 55.7468395
+                  manager_info: {}
+                  booking: {}
+        '401':
+          description: JWT истёк или не прошёл проверку
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid:
+                  value:
+                    detail: Invalid session token
+                expired:
+                  value:
+                    detail: Session expired
+                validation:
+                  value:
+                    detail: Could not validate session
+      security:
+      - HTTPBearer: []
+  /api/book:
+    post:
+      summary: Book
+      description: Защищенное бронирование места
+      operationId: book_api_book_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingRequest'
+        required: true
+      responses:
+        '200':
+          description: Бронирование успешно создано
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponse'
+              example:
+                status: success
+                message: User 456383042 booked homestay 4
+                last_booking: '2026-09-28T22:18:32'
+                available_beds: 29
+                booking_id: 1
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '400':
+          description: В выбранном пункте нет свободных мест
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: No available beds left
+        '401':
+          description: JWT истёк или не прошёл проверку
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid:
+                  value:
+                    detail: Invalid session token
+                expired:
+                  value:
+                    detail: Session expired
+                validation:
+                  value:
+                    detail: Could not validate session
+        '404':
+          description: Пункт размещения или пользователь не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                homestayNotFound:
+                  value:
+                    detail: Homestay not found
+                userNotFound:
+                  value:
+                    detail: User not found
+        '409':
+          description: Пользователь уже забронировал этот пункт
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Booking already created
+        '429':
+          description: Повторное бронирование раньше окончания 5-секундного cooldown
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Повторное бронирование можно сделать через 4 сек.
+      security:
+      - HTTPBearer: []
+  /{full_path}:
+    get:
+      summary: Spa
+      operationId: spa__full_path__get
+      parameters:
+      - name: full_path
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Full Path
+      responses:
+        '200':
+          description: SPA index.html либо статический файл из Web/dist.
+          content:
+            text/html:
+              schema:
+                type: string
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+components:
+  schemas:
+    AuthRequest:
+      properties:
+        initData:
+          type: string
+          title: Initdata
+          description: Строка initData, полученная от MAX Mini App.
+      type: object
+      required:
+      - initData
+      title: AuthRequest
+    BookingRequest:
+      properties:
+        id_homestay:
+          type: integer
+          title: Id Homestay
+          example: 4
+      type: object
+      required:
+      - id_homestay
+      title: BookingRequest
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+    AuthResponse:
+      type: object
+      required:
+      - access_token
+      - token_type
+      properties:
+        access_token:
+          type: string
+          description: JWT сессии пользователя.
+        token_type:
+          type: string
+          const: bearer
+          example: bearer
+      title: AuthResponse
+    ErrorResponse:
+      type: object
+      required:
+      - detail
+      properties:
+        detail:
+          type: string
+      title: ErrorResponse
+    User:
+      type: object
+      required:
+      - id
+      - username
+      - user_type
+      - phone_number
+      - id_homestay
+      - last_booking
+      properties:
+        id:
+          type: integer
+          example: 178897946
+        username:
+          type:
+          - string
+          - 'null'
+          example: amir
+        user_type:
+          type: integer
+          example: 1
+        phone_number:
+          type:
+          - string
+          - 'null'
+          example: ''
+        id_homestay:
+          type:
+          - integer
+          - 'null'
+          example: 2
+        last_booking:
+          type:
+          - string
+          - 'null'
+          example: '2026-09-28T10:15:20'
+      title: User
+    Booking:
+      type: object
+      required:
+      - id
+      - user_id
+      - homestay_id
+      - date_time
+      - is_approved
+      properties:
+        id:
+          type: integer
+          example: 1
+        user_id:
+          type:
+          - integer
+          - 'null'
+          example: 456383042
+        homestay_id:
+          type:
+          - integer
+          - 'null'
+          example: 4
+        date_time:
+          type:
+          - string
+          - 'null'
+          example: '2026-09-28T22:18:32'
+        is_approved:
+          type: integer
+          example: 0
+      title: Booking
+    Place:
+      type: object
+      required:
+      - id
+      - address
+      - all_beds
+      - available_beds
+      - open_time
+      - close_time
+      - is_working
+      - additional_info
+      - homestay_type
+      - longtitude
+      - latitude
+      - manager_info
+      - booking
+      properties:
+        id:
+          type: integer
+          example: 4
+        address:
+          type:
+          - string
+          - 'null'
+          example: Москва, Фрязевская, 10Б
+        all_beds:
+          type: integer
+          example: 30
+        available_beds:
+          type: integer
+          example: 30
+        open_time:
+          type:
+          - string
+          - 'null'
+          example: '21:30'
+        close_time:
+          type:
+          - string
+          - 'null'
+          example: '22:15'
+        is_working:
+          type: integer
+          example: 1
+        additional_info:
+          type:
+          - string
+          - 'null'
+          example: Новый пункт, добавленный вручную.
+        homestay_type:
+          type:
+          - integer
+          - 'null'
+          description: 'Тип пункта: 0 — не указан, 1 — пункт обогрева, 2 — ночной приют, 3 — бесплатный душ, 4 — ночной автобус,
+            5 — пункт выдачи одежды/гигиены, 6 — консультационная служба.'
+          enum:
+          - 0
+          - 1
+          - 2
+          - 3
+          - 4
+          - 5
+          - 6
+          - null
+          example: 4
+        longtitude:
+          type:
+          - number
+          - 'null'
+          format: double
+          example: 37.8302216
+        latitude:
+          type:
+          - number
+          - 'null'
+          format: double
+          example: 55.7468395
+        manager_info:
+          description: Объект менеджера пункта либо пустой объект {}.
+          oneOf:
+          - $ref: '#/components/schemas/User'
+          - type: object
+            maxProperties: 0
+        booking:
+          description: Бронирование текущего пользователя для этого пункта либо пустой объект {}.
+          oneOf:
+          - $ref: '#/components/schemas/Booking'
+          - type: object
+            maxProperties: 0
+      title: Place
+    PlacesResponse:
+      type: object
+      required:
+      - user_id
+      - places
+      properties:
+        user_id:
+          type: integer
+          example: 456383042
+        places:
+          type: array
+          items:
+            $ref: '#/components/schemas/Place'
+      title: PlacesResponse
+    BookingResponse:
+      type: object
+      required:
+      - status
+      - message
+      - last_booking
+      - available_beds
+      - booking_id
+      properties:
+        status:
+          type: string
+          const: success
+          example: success
+        message:
+          type: string
+          example: User 456383042 booked homestay 4
+        last_booking:
+          type: string
+          example: '2026-09-28T22:18:32'
+        available_beds:
+          type: integer
+          example: 29
+        booking_id:
+          type: integer
+          example: 1
+      title: BookingResponse
+  securitySchemes:
+    HTTPBearer:
+      type: http
+      scheme: bearer
+servers:
+- url: https://homelessness.bot.nu

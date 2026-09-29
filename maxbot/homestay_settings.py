@@ -1,11 +1,6 @@
-import json
-import sqlite3
 from maxbot.bot_manager import bot, keyboard_to_start
-from database.db_manager import *
 from maxbot.functions import *
-from maxbot.maxapi import Bot
 import dotenv
-from parser.parser import proceed_parsing
 import parser.coordinates_finder as coordinates_finder
 from database import db_manager, classes
 
@@ -226,17 +221,21 @@ async def update_geo_info(user_id: int, homestay_id: int, bot, update):
     homestay = db_manager.get_homestay(id=homestay_id)
     longitute, latitude, res = coordinates_finder.get_coordinates(homestay.address)
     keyboard = InlineKeyboardMarkup()
-    keyboard.add_button(f"Хорошо", button_types.callback, json.dumps({
-        "command": "edit_one_homestay",
-        "homestay_id": homestay_id
-    }))
-    if not res:
-        await bot.send_msg(user_id, f"Ошибка обновления координат. Возможно, указан неизвестный адрес.",
-                     keyboard.keyboard)
-        return
+    keyboard.add_button("❌ Отмена", button_types.callback, json.dumps(
+        {
+            "command": "edit_one_homestay",
+            "homestay_id": homestay_id
+        }
+    ))
 
-    await bot.send_msg(user_id, f"Координаты обновлены! Проверьте карту. ",
+    await bot.send_msg(user_id, f"🏠 Иногда пункты на карте отображаются неправильно - мы работаем над этим!\n"
+                                f"🌍 Ниже вы можете ввести координаты места в формате <широта>, <долгота>.\n\n"
+                                f"❗️ Координаты можете узнать на любой удобной вам карте (Яндекс, 2Гис и тд).",
                  keyboard.keyboard)
+    bot.set_next_step(user_id, json.dumps({
+        "command": "input_new_geo_coordinates",
+        "target_homestay": homestay_id
+    }))
 
 
 HOMESTAY_ACTIONS = {
@@ -372,6 +371,48 @@ async def input_new_description(update, bot):
         db_manager.insert_or_update_homestay(homestay)
         bot.clear_next_step(sender_id)
     await edit_one_homestay(update, bot, True, homestay_id)
+
+
+@bot.message_handler(func=lambda msg, tp: safe_json_loads(
+    bot.get_next_step(msg.get("message", {}).get("sender", {}).get("user_id", 0))).get(
+    "command") == "input_new_geo_coordinates")
+async def input_new_description(update, bot):
+    sender_id = update.get('message', {}).get('sender', {}).get('user_id', 0)
+    text = update.get("message", {}).get("body", {}).get('text', "").strip()
+    step_data = safe_json_loads(bot.get_next_step(sender_id))
+    homestay_id = step_data.get("target_homestay")
+    keyboard = InlineKeyboardMarkup()
+    keyboard.add_button("❌ Отмена", button_types.callback, json.dumps(
+        {
+            "command": "edit_one_homestay",
+            "homestay_id": homestay_id
+        }
+    ))
+    try:
+        latitude, longitude  = map(float, text.split(","))
+    except Exception as e:
+        await bot.send_msg(sender_id, (f"Неудалось распознать координаты. \n"
+                                      f"Пожалуйста, введите их в формате <широта>, <долгота>"),
+                           keyboard.keyboard)
+        return
+    if not await require_homestay_access(update, bot, homestay_id):
+        bot.clear_next_step(sender_id)
+        return
+
+    homestay = db_manager.get_homestay(id=homestay_id)
+    if homestay:
+        homestay.longtitude = longitude
+        homestay.latitude = latitude
+        db_manager.insert_or_update_homestay(homestay)
+        bot.clear_next_step(sender_id)
+    keyboard = InlineKeyboardMarkup()
+    keyboard.add_button("Хорошо", button_types.callback, json.dumps(
+        {
+            "command": "edit_one_homestay",
+            "homestay_id": homestay_id
+        }
+    ))
+    await bot.send_msg(sender_id, f"Изменения применены! Проверьте карту.", keyboard.keyboard)
 
 
 @bot.message_handler(func=lambda msg, tp: safe_json_loads(
@@ -521,7 +562,6 @@ async def edit_user_button_pressed(update, bot, send_new = False):
     keyboard = InlineKeyboardMarkup()
     keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
     if is_admin(actor):
-        keyboard.add_button("🔄 Обновить базу", button_types.callback, payload="update_db")
         keyboard.add_button("🏠 Добавить новый пункт",
                             button_types.callback,
                             payload=json.dumps({
@@ -593,7 +633,7 @@ async def edit_one_homestay(update, bot, send_new = False, homestay_id = -1):
     keyboard.add_button("Изменить тип пункта", button_types.callback, payload=json.dumps(
         {"command": "change_type_homestay", "homestay_id": homestay_id}
     ))
-    keyboard.add_button("Обновить координаты (положение на карте)", button_types.callback, payload=json.dumps(
+    keyboard.add_button("Ввести координаты вручную", button_types.callback, payload=json.dumps(
         {"command": "update_geo_info", "homestay_id": homestay_id}
     ))
     if not send_new:
@@ -618,12 +658,12 @@ async def handle_homestay_management(update, bot):
     action_func = HOMESTAY_ACTIONS[command]
     await action_func(sender_id, homestay_id, bot, update)
 
-@bot.message_handler(func=lambda msg, tp:
-msg.get("callback", {}).get("payload", "") == "update_db")
-async def update_db(update, bot):
-    if not await require_admin(update, bot):
-        return
-    msg_id = update.get('message', {}).get('body', {}).get('mid', "")
-    await bot.edit_msg(msg_id, f"🔄 Обновление данных... Пожалуйста, ждите.")
-    proceed_parsing()
-    await edit_user_button_pressed(update, bot)
+# @bot.message_handler(func=lambda msg, tp:
+# msg.get("callback", {}).get("payload", "") == "update_db")
+# async def update_db(update, bot):
+#     if not await require_admin(update, bot):
+#         return
+#     msg_id = update.get('message', {}).get('body', {}).get('mid', "")
+#     await bot.edit_msg(msg_id, f"🔄 Обновление данных... Пожалуйста, ждите.")
+#     proceed_parsing()
+#     await edit_user_button_pressed(update, bot)

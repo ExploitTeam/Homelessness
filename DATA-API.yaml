@@ -1,0 +1,77 @@
+version: '1.0'
+Team: Exploit
+base_url: https://homelessness.bot.nu
+checks:
+- id: auth
+  method: POST
+  path: /api/auth
+  role: max_mini_app_user
+  headers:
+    accept: '*/*'
+    Content-Type: application/json
+  body:
+    initData: ${MAX_INIT_DATA}
+  expected_status_codes:
+  - 200
+  expected_response:
+    content_type: application/json
+    required_fields:
+    - access_token
+    - token_type
+    field_values:
+      token_type: bearer
+  save_response_fields:
+    ACCESS_TOKEN: access_token
+- id: places
+  method: GET
+  path: /api/places
+  role: authenticated_user
+  headers:
+    accept: '*/*'
+    Authorization: Bearer ${ACCESS_TOKEN}
+  expected_status_codes:
+  - 200
+  expected_response:
+    content_type: application/json
+    required_fields:
+    - user_id
+    - places
+    places_item_required_fields:
+    - id
+    - address
+    - all_beds
+    - available_beds
+    - open_time
+    - close_time
+    - is_working
+    - additional_info
+    - homestay_type
+    - longtitude
+    - latitude
+    - manager_info
+    - booking
+- id: book
+  method: POST
+  path: /api/book
+  role: authenticated_user
+  headers:
+    accept: '*/*'
+    Authorization: Bearer ${ACCESS_TOKEN}
+    Content-Type: application/json
+  body:
+    id_homestay: ${TEST_HOMESTAY_ID}
+  expected_status_codes:
+  - 200
+  expected_response:
+    content_type: application/json
+    required_fields:
+    - status
+    - message
+    - last_booking
+    - available_beds
+    - booking_id
+    field_values:
+      status: success
+test_variables:
+  MAX_INIT_DATA: Валидная строка initData из MAX Mini App для тестового пользователя
+  TEST_HOMESTAY_ID: ID заранее подготовленного тестового пункта со свободным местом и без активной брони у тестового пользователя

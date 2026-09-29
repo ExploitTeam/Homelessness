@@ -1,5 +1,7 @@
 import json
 import os
+from datetime import timedelta
+
 import dotenv
 from maxbot.bot_manager import bot, keyboard_to_start, HOMESTAYS_PER_PAGE
 from maxbot.inline_keyboard import InlineKeyboardMarkup, button_types
@@ -8,6 +10,10 @@ from database.db_manager import *
 from database import db_manager
 dotenv.load_dotenv()
 
+
+CLEAN_EVERY = timedelta(hours=int(os.getenv("CLEAN_EVERY", 1)))
+UNAPPROVED_TTL = timedelta(hours=int(os.getenv("UNAPPROVED_TTL", 3)))
+APPROVED_TTL = timedelta(hours=int(os.getenv("APPROVED_TTL", 24)))
 MY_BOOKINGS_STEP = "my_bookings"
 MANAGE_BOOKINGS_STEP = "manage_homestay_bookings"
 ADMINS = [int(i) for i in os.getenv("MAX_ADMINS_ID", "").split(",")]
@@ -457,9 +463,9 @@ async def update_booking_info(update, bot):
     if not booking:
         await bot.edit_msg(
             mid,
-            "Такого бронирования не существует. "
-            "Все бронирования автоматически удаляются через сутки, "
-            "не подтвержденные - через 1 час.",
+            f"Такого бронирования не существует. "
+            f"Все бронирования автоматически удаляются через {APPROVED_TTL} час(-ов), "
+            f"не подтвержденные - через {UNAPPROVED_TTL} час(-а).",
             keyboard_to_start.keyboard,
         )
         return
