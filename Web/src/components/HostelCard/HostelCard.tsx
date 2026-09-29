@@ -3,7 +3,7 @@ import {
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
-  type PointerEvent as ReactPointerEvent,
+  type TouchEvent as ReactTouchEvent,
 } from "react";
 
 import type { Hostel, UserLocation } from "../../types";
@@ -36,6 +36,7 @@ type HostelWithServerData = Hostel & {
 
 interface DragState {
   active: boolean;
+  input: "mouse" | "touch" | null;
   startY: number;
   startOffset: number;
   currentOffset: number;
@@ -193,10 +194,9 @@ export default function HostelCard({
 }: HostelCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
 
-  const suppressCollapsedClickRef = useRef(false);
-
   const dragRef = useRef<DragState>({
     active: false,
+    input: null,
     startY: 0,
     startOffset: 0,
     currentOffset: 0,
@@ -228,8 +228,7 @@ export default function HostelCard({
   const isBooked = booked || serverBooking !== null;
 
   const getCollapsedOffset = (): number => {
-    const height =
-      cardRef.current?.getBoundingClientRect().height ?? 0;
+    const height = cardRef.current?.offsetHeight ?? 0;
 
     // На телефоне оставляем видимыми ручку + заголовок/часть адреса.
     // На desktop/fullscreen оставляем компактную полоску с ручкой,
@@ -385,8 +384,12 @@ export default function HostelCard({
       cardRef.current.scrollTop = 0;
     }
 
+    // Два кадра дают React/WebView MAX время применить новый DOM,
+    // после чего высота карточки измеряется корректно и она сворачивается.
     window.requestAnimationFrame(() => {
-      setSheetPosition(true);
+      window.requestAnimationFrame(() => {
+        setSheetPosition(true);
+      });
     });
   };
 
@@ -399,40 +402,32 @@ export default function HostelCard({
     }
   };
 
-  const handleSheetPointerDown = (
-    event: ReactPointerEvent<HTMLDivElement>
+  const beginSheetDrag = (
+    clientY: number,
+    input: "mouse" | "touch"
   ) => {
-    // Pointer Events работают и для touch, и для мыши.
-    // Поэтому один и тот же drag-механизм используется на телефоне
-    // и в полноэкранной desktop-версии.
-    event.preventDefault();
-
     const maxOffset = getCollapsedOffset();
 
     dragRef.current = {
       active: true,
-      startY: event.clientY,
+      input,
+      startY: clientY,
       startOffset: sheetOffset,
       currentOffset: sheetOffset,
       maxOffset,
     };
 
     setSheetDragging(true);
-    event.currentTarget.setPointerCapture(event.pointerId);
   };
 
-  const handleSheetPointerMove = (
-    event: ReactPointerEvent<HTMLDivElement>
-  ) => {
+  const updateSheetDrag = (clientY: number) => {
     const state = dragRef.current;
 
     if (!state.active) {
       return;
     }
 
-    event.preventDefault();
-
-    const delta = event.clientY - state.startY;
+    const delta = clientY - state.startY;
     const next = Math.min(
       state.maxOffset,
       Math.max(0, state.startOffset + delta)
@@ -442,89 +437,157 @@ export default function HostelCard({
     setSheetOffset(next);
   };
 
-  const finishSheetDrag = (
-    event: ReactPointerEvent<HTMLDivElement>
-  ) => {
+  const finishSheetDragAt = (clientY: number) => {
     const state = dragRef.current;
 
     if (!state.active) {
       return;
     }
 
-    state.active = false;
-    setSheetDragging(false);
-
-    const delta = event.clientY - state.startY;
+    const delta = clientY - state.startY;
     const movement = Math.abs(delta);
 
-    /*
-     * Обычный клик/тап по ручке, когда карточка уже опущена,
-     * раскрывает её без необходимости тянуть вверх.
-     *
-     * Если пользователь действительно перетаскивал карточку,
-     * следующий browser click подавляем, чтобы она не раскрылась
-     * сразу после свайпа вниз.
-     */
-    if (
-      movement <= 8 &&
-      state.startOffset > state.maxOffset / 2
-    ) {
-      state.currentOffset = 0;
-      setSheetOffset(0);
-      suppressCollapsedClickRef.current = false;
-    } else {
-      suppressCollapsedClickRef.current = movement > 8;
+    state.active = false;
+    state.input = null;
+    setSheetDragging(false);
 
-      // Явный свайп вниз/вверх имеет приоритет.
-      // При маленьком движении выбираем ближайшее положение.
+    let nextOffset: number;
+
+    if (movement <= 8) {
+      /*
+       * В MAX WebView простой клик надёжнее drag-жеста.
+       * Поэтому короткое нажатие по верхней ручке переключает
+       * состояние карточки в обе стороны:
+       * раскрыта -> свернуть, свернута -> раскрыть.
+       */
+      const wasCollapsed =
+        state.startOffset > state.maxOffset / 2;
+
+      nextOffset = wasCollapsed
+        ? 0
+        : state.maxOffset;
+    } else {
       const collapse =
         delta > 42 ||
         (delta >= -42 &&
           state.currentOffset > state.maxOffset / 2);
 
-      const nextOffset = collapse
+      nextOffset = collapse
         ? state.maxOffset
         : 0;
-
-      state.currentOffset = nextOffset;
-      setSheetOffset(nextOffset);
     }
 
-    try {
-      event.currentTarget.releasePointerCapture(
-        event.pointerId
-      );
-    } catch {
-      // Pointer capture мог уже освободиться браузером.
-    }
-  };
+    state.currentOffset = nextOffset;
+    setSheetOffset(nextOffset);
 
-  const handleCollapsedCardClick = (
-    event: ReactMouseEvent<HTMLDivElement>
-  ) => {
-    if (sheetOffset <= 8 || sheetDragging) {
-      return;
-    }
-
-    if (suppressCollapsedClickRef.current) {
-      suppressCollapsedClickRef.current = false;
-      return;
-    }
-
-    const target = event.target as HTMLElement;
-
-    // Крестик должен по-прежнему закрывать карточку,
-    // а не сначала раскрывать её.
-    if (target.closest(".hostel-card__close")) {
-      return;
-    }
-
-    setSheetPosition(false);
-
-    if (cardRef.current) {
+    if (nextOffset === 0 && cardRef.current) {
       cardRef.current.scrollTop = 0;
     }
   };
+
+  const handleSheetMouseDown = (
+    event: ReactMouseEvent<HTMLDivElement>
+  ) => {
+    if (event.button !== 0) {
+      return;
+    }
+
+    event.preventDefault();
+    beginSheetDrag(event.clientY, "mouse");
+  };
+
+  const handleSheetTouchStart = (
+    event: ReactTouchEvent<HTMLDivElement>
+  ) => {
+    const touch = event.touches[0];
+
+    if (!touch) {
+      return;
+    }
+
+    event.preventDefault();
+    beginSheetDrag(touch.clientY, "touch");
+  };
+
+  const handleSheetTouchMove = (
+    event: ReactTouchEvent<HTMLDivElement>
+  ) => {
+    const state = dragRef.current;
+
+    if (!state.active || state.input !== "touch") {
+      return;
+    }
+
+    const touch = event.touches[0];
+
+    if (!touch) {
+      return;
+    }
+
+    event.preventDefault();
+    updateSheetDrag(touch.clientY);
+  };
+
+  const handleSheetTouchEnd = (
+    event: ReactTouchEvent<HTMLDivElement>
+  ) => {
+    const state = dragRef.current;
+
+    if (!state.active || state.input !== "touch") {
+      return;
+    }
+
+    const touch = event.changedTouches[0];
+    finishSheetDragAt(touch?.clientY ?? state.startY);
+  };
+
+  const toggleSheet = () => {
+    const maxOffset = getCollapsedOffset();
+    const collapsed = sheetOffset > maxOffset / 2;
+    setSheetPosition(!collapsed);
+
+    if (collapsed && cardRef.current) {
+      cardRef.current.scrollTop = 0;
+    }
+  };
+
+  /*
+   * В desktop/MAX не используем setPointerCapture.
+   * Движение мыши отслеживаем на window, поэтому карточка продолжает
+   * следовать за курсором даже если он вышел за пределы ручки.
+   */
+  useEffect(() => {
+    const handleMouseMove = (event: MouseEvent) => {
+      const state = dragRef.current;
+
+      if (!state.active || state.input !== "mouse") {
+        return;
+      }
+
+      event.preventDefault();
+      updateSheetDrag(event.clientY);
+    };
+
+    const handleMouseUp = (event: MouseEvent) => {
+      const state = dragRef.current;
+
+      if (!state.active || state.input !== "mouse") {
+        return;
+      }
+
+      finishSheetDragAt(event.clientY);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove, {
+      passive: false,
+    });
+    window.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  });
 
   return (
     <div
@@ -537,7 +600,6 @@ export default function HostelCard({
       style={{
         transform: `translateX(-50%) translateY(${sheetOffset}px)`,
       }}
-      onClick={handleCollapsedCardClick}
     >
       {sheetOffset > 8 && (
         <div
@@ -545,10 +607,11 @@ export default function HostelCard({
           role="button"
           tabIndex={0}
           aria-label="Открыть карточку"
-          onPointerDown={handleSheetPointerDown}
-          onPointerMove={handleSheetPointerMove}
-          onPointerUp={finishSheetDrag}
-          onPointerCancel={finishSheetDrag}
+          onMouseDown={handleSheetMouseDown}
+          onTouchStart={handleSheetTouchStart}
+          onTouchMove={handleSheetTouchMove}
+          onTouchEnd={handleSheetTouchEnd}
+          onTouchCancel={handleSheetTouchEnd}
           onKeyDown={(event) => {
             if (event.key === "Enter" || event.key === " ") {
               event.preventDefault();
@@ -560,11 +623,24 @@ export default function HostelCard({
 
       <div
         className="hostel-card__sheet-handle-area"
-        onPointerDown={handleSheetPointerDown}
-        onPointerMove={handleSheetPointerMove}
-        onPointerUp={finishSheetDrag}
-        onPointerCancel={finishSheetDrag}
-        aria-label="Потяните вниз, чтобы свернуть карточку, или вверх, чтобы открыть"
+        role="button"
+        tabIndex={0}
+        onMouseDown={handleSheetMouseDown}
+        onTouchStart={handleSheetTouchStart}
+        onTouchMove={handleSheetTouchMove}
+        onTouchEnd={handleSheetTouchEnd}
+        onTouchCancel={handleSheetTouchEnd}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            toggleSheet();
+          }
+        }}
+        aria-label={
+          sheetOffset > 8
+            ? "Развернуть карточку"
+            : "Свернуть карточку"
+        }
       >
         <span className="hostel-card__sheet-handle" />
       </div>

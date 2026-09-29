@@ -116,7 +116,7 @@ button {
   justify-content: center;
 
   width: 100%;
-  height: 30px;
+  height: 42px;
   margin: 0;
 
   background:
@@ -128,11 +128,17 @@ button {
     );
 
   touch-action: none;
-  cursor: ns-resize;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .hostel-card--dragging .hostel-card__sheet-handle-area {
   cursor: grabbing;
+}
+
+.hostel-card__sheet-handle-area:hover .hostel-card__sheet-handle {
+  background: #9ca3af;
 }
 
 .hostel-card__sheet-handle {
