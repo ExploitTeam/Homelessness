@@ -1,7 +1,6 @@
 import os
 from database.classes import *
 from maxbot.maxapi import Bot
-from parser.modules import *
 from maxbot.inline_keyboard import *
 from database.db_manager import *
 from dotenv import load_dotenv

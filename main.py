@@ -3,7 +3,6 @@ import sys
 from database import db_manager
 from maxbot.bot_manager import *
 import api.http_server as http_server
-import parser.parser
 import os
 import dotenv
 import asyncio
