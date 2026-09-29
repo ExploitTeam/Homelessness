@@ -701,3 +701,72 @@ body {
     max-width: none;
   }
 }
+/*Если че просто удалить*/
+
+.hostel-card--route {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  width: auto;
+  max-width: none;
+  z-index: 9999;
+}
+
+.hostel-card__route-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+}
+
+.hostel-card__route-preview-icon {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border-radius: 12px;
+  background: #eef2ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+
+.hostel-card__route-preview-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hostel-card__route-preview-info strong {
+  font-size: 15px;
+}
+
+.hostel-card__route-preview-info span {
+  font-size: 13px;
+  opacity: 0.65;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hostel-card__route-preview-button,
+.hostel-card__route-preview-close {
+  border: none;
+  cursor: pointer;
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-weight: 600;
+}
+
+.hostel-card__route-preview-button {
+  background: #f1f5f9;
+}
+
+.hostel-card__route-preview-close {
+  background: #fee2e2;
+  color: #b91c1c;
+  font-size: 18px;
+}

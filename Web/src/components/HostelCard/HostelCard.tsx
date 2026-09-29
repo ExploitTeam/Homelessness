@@ -229,7 +229,48 @@ export default function HostelCard({
   const handleContacts = () => {
     setShowContacts((current) => !current);
   };
+  const handleExpandRouteCard = () => {
+  setShowRoute(false);
+  };
+  const handleHideRoute = () => {
+    setShowRoute(false);
+    onShowRoute(null);
+  };
 
+  if (showRoute && metroRoute) {
+    return (
+      <div className="hostel-card hostel-card--route">
+        <div className="hostel-card__route-preview">
+          <div className="hostel-card__route-preview-icon">
+            🚇
+          </div>
+
+          <div className="hostel-card__route-preview-info">
+            <strong>Маршрут построен</strong>
+            <span>{hostel.name}</span>
+          </div>
+
+          <button
+            type="button"
+            className="hostel-card__route-preview-button"
+            onClick={handleExpandRouteCard}
+          >
+            Развернуть
+          </button>
+
+          <button
+            type="button"
+            className="hostel-card__route-preview-close"
+            onClick={handleHideRoute}
+          >
+            ×
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  
   return (
     <div className="hostel-card">
       <button
