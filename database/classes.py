@@ -28,13 +28,15 @@ class HomestayTypes(Enum):
 class User:
     def __init__(self, id : int = 0, username : str | None = None,
                  user_type : int = 0, phone_number : str | None = None,
-                 id_homestay : int | None = None, last_booking : str | None = None):
+                 id_homestay : int | None = None, last_booking : str | None = None,
+                 fund_id : int | None = None):
         self.id = id
         self.username = username
         self.user_type = user_type
         self.phone_number = phone_number
         self.id_homestay = id_homestay
         self.last_booking = last_booking
+        self.fund_id = fund_id
 
 
     def __get_type(self):
@@ -42,22 +44,23 @@ class User:
             return "Пользователь"
         elif self.user_type == 1:
             return "Mенеджер"
-        else:
-            return "Администратор"
+        elif self.user_type == 2:
+            return "Администратор бота"
+        elif self.user_type == 3:
+            return "Администратор фонда"
+        return "Неизвестная роль"
 
     def __str__(self):
-        from database.db_manager import get_homestay
-        homestay = get_homestay(self.id_homestay)
-        address = ""
-        if homestay:
-            address = homestay.address
+        from database.db_manager import get_manager_points, get_fund
+        points = get_manager_points(self.id) if self.user_type == 1 else []
+        fund = get_fund(self.fund_id) if self.fund_id else None
         return (f"🆔 {self.id}\n"
-                f"👤 Username: {self.username}\n"
-                f"⚡️ Тип учетной записи: {self.__get_type()}\n"
-                f"📱 Телефон: {self.phone_number if self.phone_number else 'n/a'}\n"
-                f"{f'📍 Привязка к точке: {address}\n' if address and self.id_homestay
-                else '📍 Без привязки к точке\n' if self.user_type > 0 else ''}"
-                f"🏠 Последнее бронирование: {'-' if self.last_booking is None else self.last_booking}\n")
+                f"👤 Имя: {self.username or '-'}\n"
+                f"⚡️ Роль: {self.__get_type()}\n"
+                f"📱 Телефон: {self.phone_number or '-'}\n"
+                f"{'🏛️ Фонд: ' + fund['name'] + chr(10) if fund else ''}"
+                f"{'📍 Пункты: ' + ', '.join(str(p.id) + ' — ' + p.address for p in points) + chr(10) if points else ''}"
+                f"🏠 Последняя бронь: {self.last_booking or '-'}")
 
 
 class Homestay:
@@ -66,7 +69,8 @@ class Homestay:
                  open_time : str | None = None, close_time : str | None = None,
                  is_working : int = 0, additional_info : str | None = None,
                  homestay_type : int | None = None,
-                 longtitude : float | None = None, latitude : float | None = None):
+                 longtitude : float | None = None, latitude : float | None = None,
+                 fund_id : int | None = None):
         self.id = id
         self.address = address
         self.all_beds = all_beds or 0
@@ -76,8 +80,10 @@ class Homestay:
         self.is_working = is_working
         self.additional_info = additional_info
         self.homestay_type = homestay_type
+        self.fund_id = fund_id
 
-        if not longtitude or not latitude:
+        # Не выполняем сетевые запросы при каждом чтении существующей записи.
+        if id == 0 and (longtitude is None or latitude is None) and address:
             self.latitude, self.longtitude, _ = coordinates_finder.get_coordinates(address)
         else:
             self.latitude = latitude
@@ -85,26 +91,28 @@ class Homestay:
         
 
     def __str__(self):
-        from database.db_manager import get_user
+        from database.db_manager import get_homestay_managers, get_fund
         from maxbot.functions import is_point_open
-        usr = get_user(id_homestay=self.id)
-        manager = ""
-        if usr:
-            name = usr.username
-            phone = usr.phone_number
-            manager = (f"😎 Менеджер: {name if name else '-'}\n"
-                       f"📱 Телефон менеджера: {phone if phone else '-'}\n")
-
-        return (f"📍 Адрес: {self.address}\n"
-                f"🔵 Тип: {HomestayTypes(self.homestay_type).label if self.homestay_type else '-'}\n"
-                f"{manager}"
+        managers = get_homestay_managers(self.id)
+        fund = get_fund(self.fund_id)
+        manager_text = "\n".join(
+            f"😎 {manager.username or manager.id} (ID {manager.id}), телефон: {manager.phone_number or '-'}"
+            for manager in managers
+        ) or "Не назначены"
+        try:
+            opened = is_point_open(self.open_time, self.close_time)
+        except (ValueError, TypeError):
+            opened = False
+        return (f"🏛️ Фонд: {fund['name'] if fund else '-'}\n"
+                f"📍 Адрес: {self.address}\n"
+                f"🔵 Тип: {HomestayTypes(self.homestay_type).label if self.homestay_type in [t.value for t in HomestayTypes] else '-'}\n"
+                f"👥 Менеджеры: {manager_text}\n"
                 f"👤 Всего мест: {self.all_beds}\n"
                 f"👤 Свободно: {self.available_beds}\n"
                 f"⏳ Часы работы: {self.open_time} - {self.close_time}\n"
-                f"{'🟢  Работает' if self.is_working else '🔴  Не работает'}\n"
-                f"{'🟢  СЕЙЧАС ОТКРЫТ\n' if is_point_open(self.open_time, self.close_time) and self.is_working
-                else '🔴  СЕЙЧАС ЗАКРЫТ\n' if self.is_working else ''}"
-                f"❗️ {self.additional_info if self.additional_info else 'Дополнительная информация отсутствует'}")
+                f"{'🟢 Работает' if self.is_working else '🔴 Не работает'}\n"
+                f"{'🟢 Сейчас открыто' if opened and self.is_working else '🔴 Сейчас закрыто'}\n"
+                f"❗️ {self.additional_info or 'Дополнительная информация отсутствует'}")
 
     def to_json(self):
         return {
@@ -151,28 +159,13 @@ class Booking:
 
 
     def __str__(self):
-        from database.db_manager import get_homestay, get_user
-        from maxbot.functions import is_point_open
-
+        from database.db_manager import get_homestay, get_homestay_managers
         homestay = get_homestay(id=self.homestay_id)
-        user = get_user(id=self.user_id)
-        if not homestay or not user:
-            return f"Бронирование с ID {self.id} недействительно. "
-
-        manager = ""
-        usr_manager = get_user(id_homestay=homestay.id)
-        if usr_manager:
-            name = usr_manager.username
-            phone = usr_manager.phone_number
-            manager = (f"😎 Менеджер: {name if name else '-'}\n"
-                       f"📱 Телефон менеджера: {phone if phone else '-'}\n")
-
+        address = homestay.address if homestay else "Пункт удалён"
+        managers = get_homestay_managers(self.homestay_id)
+        manager_text = ", ".join(f"{m.username or m.id} ({m.phone_number or '-'})" for m in managers) or "не назначены"
         return (f"ID бронирования: {self.id}\n"
-                f"Дата: {datetime.fromisoformat(self.date_time)}\n"
-                f"📍 Адрес пункта: {homestay.address}\n"
-                f"⚡️ Тип: {HomestayTypes(homestay.homestay_type).label}\n"
-                f"⏳ Часы работы: {homestay.open_time} - {homestay.close_time}\n"
-                f"{'🟢  СЕЙЧАС ОТКРЫТ\n' if is_point_open(homestay.open_time, homestay.close_time) and homestay.is_working
-                else '🔴  СЕЙЧАС ЗАКРЫТ\n' if homestay.is_working else ''}"
-                f"{manager}\n"
-                f"{'🟢 Бронирование подтверждено' if self.is_approved else '🔴 Бронирование не подтверждено'}")
+                f"Дата: {self.date_time}\n"
+                f"📍 Адрес: {address}\n"
+                f"👥 Менеджеры: {manager_text}\n"
+                f"{'🟢 Подтверждено' if self.is_approved else '🟠 Ожидает подтверждения'}")

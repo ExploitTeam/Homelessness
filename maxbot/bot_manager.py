@@ -6,12 +6,13 @@ import os
 from dotenv import load_dotenv
 from database.db_manager import *
 from database.classes import HomestayTypes
+from database import access
 
 
 load_dotenv()
 
 TOKEN = os.getenv("MAX_TOKEN", "")
-ADMINS = [int(i) for i in os.getenv("MAX_ADMINS_ID", "").split(",")]
+ADMINS = access.global_admin_ids()
 bot = Bot(TOKEN)
 
 HOMESTAYS_PER_PAGE = 5
@@ -22,6 +23,7 @@ keyboard_to_start.add_button("На главную", button_types.callback, paylo
 from maxbot.user_settings import *
 from maxbot.homestay_settings import *
 from maxbot.bookings_settings import *
+from maxbot.fund_settings import *
 
 
 GEO_RESULTS_STEP = "geo_results"

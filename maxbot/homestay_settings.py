@@ -2,13 +2,13 @@ from maxbot.bot_manager import bot, keyboard_to_start
 from maxbot.functions import *
 import dotenv
 import parser.coordinates_finder as coordinates_finder
-from database import db_manager, classes
+from database import db_manager, classes, access
 
 dotenv.load_dotenv()
 USER_TYPE_USER = 0
 USER_TYPE_MANAGER = 1
 USER_TYPE_ADMIN = 2
-ADMINS = [int(i) for i in os.getenv("MAX_ADMINS_ID", "").split(",")]
+ADMINS = access.global_admin_ids()
 ADMIN_ONLY_COMMANDS = {"add_homestay"}
 
 
@@ -25,26 +25,19 @@ def get_actor(user_id: int):
 
 
 def is_admin(actor) -> bool:
-    return bool(actor) and (actor.user_type == USER_TYPE_ADMIN or actor.id in ADMINS)
+    return access.is_global(actor) or bool(actor and actor.user_type == access.FUND_ADMIN)
 
 
 def is_manager(actor) -> bool:
-    return bool(actor) and actor.user_type == USER_TYPE_MANAGER
+    return bool(actor and actor.user_type == access.MANAGER)
 
 
 def can_open_homestay_panel(actor) -> bool:
-    return is_admin(actor) or is_manager(actor)
+    return bool(access.managed_points(actor)) or is_admin(actor)
 
 
 def can_manage_homestay(actor, homestay_id: int) -> bool:
-    if is_admin(actor):
-        return True
-    if is_manager(actor) and actor.id_homestay is not None:
-        try:
-            return int(actor.id_homestay) == int(homestay_id)
-        except (TypeError, ValueError):
-            return False
-    return False
+    return access.can_manage_point(actor,homestay_id)
 
 
 async def deny_access(bot, user_id: int, text: str = "⛔ Недостаточно прав для этого действия."):
@@ -89,6 +82,8 @@ async def require_admin(update, bot):
 async def do_remove_homestay(user_id: int, homestay_id: int, bot, update):
     """Удаление пункта размещения"""
     homestay = db_manager.get_homestay(id=homestay_id)
+    if not homestay:
+        return
     res = db_manager.delete_homestay(homestay)
     if res:
         await bot.send_msg(user_id, f"❌ Пункт с адресом «{homestay.address}» успешно удален из базы данных.",
@@ -180,14 +175,23 @@ async def do_add_homestay(user_id: int, homestay_id: int, bot, update):
     keyboard = InlineKeyboardMarkup()
     keyboard.add_button("❌ Отмена", button_types.callback, "edit_homestay")
 
-    await bot.send_msg(user_id,
-                       "🏠 Начинаем добавление нового пункта.\n\n"
-                       "Шаг 1: Введите полный географический адрес объекта (например: Санкт-Петербург, ул. Ленина, д. 5):",
-                       keyboard.keyboard)
-
-    bot.set_next_step(user_id, json.dumps({
-        "command": "create_input_address"
-    }))
+    actor=db_manager.get_user(id=user_id)
+    funds=db_manager.get_funds() if access.is_global(actor) else [db_manager.get_fund(actor.fund_id)]
+    funds=[f for f in funds if f and access.can_create_point(actor,f['id'])]
+    if not funds:
+        await bot.send_msg(user_id,'Сначала создайте фонд в разделе «Фонды».',keyboard_to_start.keyboard)
+        return
+    if len(funds)==1:
+        keyboard=InlineKeyboardMarkup()
+        keyboard.add_button('❌ Отмена',button_types.callback,'edit_homestay')
+        bot.set_next_step(user_id,json.dumps({'command':'create_input_address','fund_id':funds[0]['id']}))
+        await bot.send_msg(user_id,f"🏛️ Фонд: {funds[0]['name']}\nВведите полный адрес нового пункта:",keyboard.keyboard)
+        return
+    keyboard=InlineKeyboardMarkup()
+    for f in funds:
+        keyboard.add_button(f['name'],button_types.callback,json.dumps({'command':'choose_create_fund','fund':f['id']}))
+    keyboard.add_button('❌ Отмена',button_types.callback,'edit_homestay')
+    await bot.send_msg(user_id,'Выберите фонд для нового пункта:',keyboard.keyboard)
 
 
 async def do_change_type(user_id: int, homestay_id: int, bot, update):
@@ -466,7 +470,9 @@ async def change_homestay_type(update, bot):
 async def create_input_beds(update, bot):
     """Шаг 3: Получаем места, ищем координаты и сохраняем пункт в БД"""
     sender_id = update.get('message', {}).get('sender', {}).get('user_id', 0)
-    if not await require_admin(update, bot):
+    step_data=safe_json_loads(bot.get_next_step(sender_id))
+    actor=db_manager.get_user(id=sender_id)
+    if not access.can_create_point(actor,step_data.get('fund_id')):
         bot.clear_next_step(sender_id)
         return
 
@@ -498,7 +504,10 @@ async def create_input_beds(update, bot):
         close_time="00:00",
         is_working=1,
         additional_info="Новый пункт, добавленный вручную.",
-        homestay_type=0
+        homestay_type=0,
+        fund_id=step_data.get('fund_id'),
+        latitude=lat,
+        longtitude=lon
     )
 
     new_homestay.latitude = lat
@@ -521,7 +530,9 @@ async def create_input_beds(update, bot):
 async def create_input_address(update, bot):
     """Шаг 2: Получаем адрес и запрашиваем количество мест"""
     sender_id = update.get('message', {}).get('sender', {}).get('user_id', 0)
-    if not await require_admin(update, bot):
+    step_data=safe_json_loads(bot.get_next_step(sender_id))
+    actor=db_manager.get_user(id=sender_id)
+    if not access.can_create_point(actor,step_data.get('fund_id')):
         bot.clear_next_step(sender_id)
         return
 
@@ -538,6 +549,7 @@ async def create_input_address(update, bot):
 
     bot.set_next_step(sender_id, json.dumps({
         "command": "create_input_beds",
+        "fund_id":step_data.get('fund_id'),
         "address": address_text
     }))
 
@@ -555,9 +567,7 @@ async def edit_user_button_pressed(update, bot, send_new = False):
 
     user = update.get('callback', {}).get('user', {})
     id = user.get('user_id', 0)
-    all_homestays = show_all(get_in_dict=True)
-    if is_manager(actor):
-        all_homestays = [h for h in all_homestays if h.id == actor.id_homestay]
+    all_homestays = access.managed_points(actor)
 
     keyboard = InlineKeyboardMarkup()
     keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
@@ -568,7 +578,8 @@ async def edit_user_button_pressed(update, bot, send_new = False):
                                 "command": "add_homestay",
                             }))
     for i in all_homestays:
-        keyboard.add_button(f"📍 {i.address}",
+        fund=db_manager.get_fund(i.fund_id)
+        keyboard.add_button(f"📍 {i.address} ({fund['name'] if fund else '-'})",
                             button_types.callback,
                             payload=json.dumps({
                                 "command": "edit_one_homestay",
@@ -588,13 +599,13 @@ async def edit_user_button_pressed(update, bot, send_new = False):
         await bot.edit_msg(msg_id, text, keyboard.keyboard)
 
 @bot.message_handler(func=lambda msg, tp:
-json.loads(msg.get("callback", {}).get("payload", "")).get("command", "") == "edit_one_homestay")
+safe_json_loads(msg.get("callback", {}).get("payload", "")).get("command", "") == "edit_one_homestay")
 async def edit_one_homestay(update, bot, send_new = False, homestay_id = -1):
     if "callback" not in update:
         user = update.get('message', {}).get('sender', {})
     else:
         user = update.get('callback', {}).get('user', {})
-        homestay_id = json.loads(update.get("callback", {}).get("payload", "")).get("homestay_id", -1)
+        homestay_id = safe_json_loads(update.get("callback", {}).get("payload", "")).get("homestay_id", -1)
 
     if not await require_homestay_access(update, bot, homestay_id):
         return
@@ -604,17 +615,18 @@ async def edit_one_homestay(update, bot, send_new = False, homestay_id = -1):
     bot.clear_next_step(id)
     msg_id = update.get('message', {}).get('body', {}).get('mid', "")
     homestay = get_homestay(homestay_id)
-    usr = get_user(id_homestay=homestay_id)
-    usr_info_homestay = ""
-    if not usr:
-        usr_info_homestay = "Нет менеджера"
-    else:
-        usr_info_homestay = usr
+    managers=db_manager.get_homestay_managers(homestay_id)
+    usr_info_homestay=(', '.join(f'{u.username or u.id} (ID {u.id})' for u in managers)
+                       or 'Не назначены')
     keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
     keyboard.add_button("⬅️ К пунктам", button_types.callback, payload="edit_homestay")
-    keyboard.add_button("❌ Удалить пункт", button_types.callback,payload=json.dumps(
-        {"command": "remove_homestay", "homestay_id": homestay_id}
-    ))
+    actor=db_manager.get_user(id=id)
+    if access.can_manage_fund(actor,homestay.fund_id):
+        keyboard.add_button('👥 Менеджеры пункта',button_types.callback,json.dumps({
+            'command':'point_staff','homestay_id':homestay_id}))
+        keyboard.add_button("❌ Удалить пункт", button_types.callback,payload=json.dumps(
+            {"command": "remove_homestay", "homestay_id": homestay_id}
+        ))
     keyboard.add_button("❌ Закрыть" if homestay.is_working else "✅ Открыть", button_types.callback, payload=json.dumps(
         {"command": "close_homestay", "homestay_id": homestay_id}
     ))
@@ -652,6 +664,12 @@ async def handle_homestay_management(update, bot):
     if command in ADMIN_ONLY_COMMANDS:
         if not await require_admin(update, bot):
             return
+    elif command == 'remove_homestay':
+        actor=get_actor(sender_id)
+        point=db_manager.get_homestay(id=homestay_id)
+        if not point or not access.can_manage_fund(actor,point.fund_id):
+            await deny_access(bot,sender_id)
+            return
     elif not await require_homestay_access(update, bot, homestay_id):
         return
 
@@ -667,3 +685,85 @@ async def handle_homestay_management(update, bot):
 #     await bot.edit_msg(msg_id, f"🔄 Обновление данных... Пожалуйста, ждите.")
 #     proceed_parsing()
 #     await edit_user_button_pressed(update, bot)
+
+
+@bot.message_handler(func=lambda m,t: safe_json_loads(m.get('callback',{}).get('payload')).get('command')=='choose_create_fund')
+async def choose_create_fund(update,bot):
+    uid=extract_user_id(update)
+    fid=int(safe_json_loads(update['callback']['payload']).get('fund') or 0)
+    if not access.can_create_point(get_actor(uid),fid):
+        await deny_access(bot,uid)
+        return
+    bot.set_next_step(uid,json.dumps({'command':'create_input_address','fund_id':fid}))
+    await bot.edit_msg(update.get('message',{}).get('body',{}).get('mid'),
+                       'Введите адрес нового пункта:',keyboard_to_start.keyboard)
+
+
+@bot.message_handler(func=lambda m,t: safe_json_loads(m.get('callback',{}).get('payload')).get('command')=='point_staff')
+async def point_staff(update,bot):
+    uid=extract_user_id(update)
+    point_id=int(safe_json_loads(update['callback']['payload']).get('homestay_id') or 0)
+    point=db_manager.get_homestay(id=point_id)
+    if not point or not access.can_manage_fund(get_actor(uid),point.fund_id):
+        await deny_access(bot,uid)
+        return
+    managers=db_manager.get_homestay_managers(point_id)
+    kb=InlineKeyboardMarkup()
+    kb.add_button('⬅️ К пункту',button_types.callback,json.dumps({'command':'edit_one_homestay','homestay_id':point_id}))
+    kb.add_button('➕ Назначить менеджера по MAX ID',button_types.callback,
+                  json.dumps({'command':'point_staff_add','homestay_id':point_id}))
+    for manager in managers:
+        kb.add_button(f'➖ Снять {manager.username or manager.id} ({manager.id})',button_types.callback,
+                      json.dumps({'command':'point_staff_remove','homestay_id':point_id,'user':manager.id}))
+    await bot.edit_msg(update.get('message',{}).get('body',{}).get('mid'),
+                       '👥 Менеджеры этого пункта:\n' + (', '.join(str(m.id) for m in managers) or 'Не назначены'),kb.keyboard)
+
+
+@bot.message_handler(func=lambda m,t: safe_json_loads(m.get('callback',{}).get('payload')).get('command')=='point_staff_add')
+async def point_staff_add(update,bot):
+    uid=extract_user_id(update)
+    point_id=int(safe_json_loads(update['callback']['payload']).get('homestay_id') or 0)
+    point=db_manager.get_homestay(id=point_id)
+    if not point or not access.can_manage_fund(get_actor(uid),point.fund_id):
+        await deny_access(bot,uid)
+        return
+    bot.set_next_step(uid,json.dumps({'command':'point_staff_input','homestay_id':point_id}))
+    await bot.edit_msg(update.get('message',{}).get('body',{}).get('mid'),
+                       'Введите MAX ID менеджера. Пользователь должен быть зарегистрирован в боте и иметь роль менеджера.',
+                       keyboard_to_start.keyboard)
+
+
+@bot.message_handler(func=lambda m,t: safe_json_loads(bot.get_next_step(
+    m.get('message',{}).get('sender',{}).get('user_id',0))).get('command')=='point_staff_input')
+async def point_staff_input(update,bot):
+    uid=extract_user_id(update)
+    data=safe_json_loads(bot.get_next_step(uid))
+    point=db_manager.get_homestay(id=data.get('homestay_id'))
+    if not point or not access.can_manage_fund(get_actor(uid),point.fund_id):
+        bot.clear_next_step(uid)
+        return
+    try: manager_id=int(update.get('message',{}).get('body',{}).get('text',''))
+    except ValueError:
+        await bot.send_msg(uid,'Введите числовой MAX ID.')
+        return
+    manager=db_manager.get_user(id=manager_id)
+    if not access.can_assign_manager(get_actor(uid),manager,point):
+        await bot.send_msg(uid,'У пользователя нет роли менеджера. Назначьте её через «Пользователи».')
+        return
+    db_manager.assign_manager(point.id,manager.id)
+    bot.clear_next_step(uid)
+    await bot.send_msg(uid,f'✅ Менеджер {manager.id} привязан к пункту {point.address}.')
+
+
+@bot.message_handler(func=lambda m,t: safe_json_loads(m.get('callback',{}).get('payload')).get('command')=='point_staff_remove')
+async def point_staff_remove(update,bot):
+    uid=extract_user_id(update)
+    data=safe_json_loads(update['callback']['payload'])
+    point_id=int(data.get('homestay_id') or 0)
+    point=db_manager.get_homestay(id=point_id)
+    if not point or not access.can_manage_fund(get_actor(uid),point.fund_id):
+        await deny_access(bot,uid)
+        return
+    db_manager.unassign_manager(point_id,int(data.get('user') or 0))
+    updated={**update,'callback':{**update['callback'],'payload':json.dumps({'command':'point_staff','homestay_id':point_id})}}
+    await point_staff(updated,bot)

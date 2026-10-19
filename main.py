@@ -34,20 +34,6 @@ def _should_delete(booking) -> bool:
         return True
     return False
 
-def _should_restore_bed(booking):
-    age = _booking_age(booking)
-    if not booking.is_approved and age >= UNAPPROVED_TTL:
-        return True
-    return False
-
-def _restore_bed(booking):
-    homestay = get_homestay(id=booking.homestay_id)
-    if not homestay:
-        return
-    homestay.available_beds = (homestay.available_beds or 0) + 1
-    insert_or_update_homestay(homestay)
-
-
 async def cleanup_bookings_loop():
     await asyncio.sleep(5)
     while True:
@@ -56,18 +42,14 @@ async def cleanup_bookings_loop():
             for booking in bookings:
                 if not _should_delete(booking):
                     continue
-                if _should_restore_bed(booking):
-                    _restore_bed(booking)
+                if db_manager.delete_booking(booking,reason='expired',restore_bed=True):
                     try:
                         from maxbot.bot_manager import bot
-                        await bot.send_msg(booking.user_id, f"❗️ Ваша бронь была автоматически удалена, "
-                                                            f"так как менеджер ее не подтвердил.\n"
-                                                            f"Информация о брони:\n\n"
-                                                            f"{booking}")
+                        await bot.send_msg(booking.user_id,
+                            f"⌛ Бронь #{booking.id} завершена автоматически. Информация сохранена в истории.\n{booking}")
                     except Exception as e:
                         print(f"Ошибка отправки уведомления: {e}")
-                delete_booking(booking)
-                print(f"Удалена бронь #{getattr(booking, 'id', '?')}")
+                    print(f"Завершена бронь #{booking.id}")
             await asyncio.sleep(CLEAN_EVERY.total_seconds())
         except Exception as error:
             print("cleanup_bookings_loop:", error)

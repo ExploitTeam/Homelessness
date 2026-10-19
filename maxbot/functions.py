@@ -3,106 +3,71 @@ from database.classes import *
 from maxbot.maxapi import Bot
 from maxbot.inline_keyboard import *
 from database.db_manager import *
+from database import access
 from dotenv import load_dotenv
 import json
 
 load_dotenv()
-ADMINS = [int(i) for i in os.getenv("MAX_ADMINS_ID", "").split(",")]
+ADMINS = access.global_admin_ids()
 
 start_text = ("Привет{} 👋\n"
-              "Это бот, который поможет вам найти место, где можно согреться или переночевать.\n\n"
-              "Нажмите кнопку «Отправить геопозицию», чтобы посмотреть ближайшие к вам ночлежки. "
-              "Обратите внимание, что отправка геопозиции может не работать в WEB-версии Макс. 🌍 \n\n"
-              "Вы можете открыть мини-приложение и ознакомиться с пунктами на карте. 😊\n\n"
-              "Ваш ID: {}.")
+              "Здесь можно найти бесплатную еду, ночлег, душ, одежду и другую помощь.\n\n"
+              "Отправьте геопозицию, чтобы посмотреть ближайшие пункты. "
+              "Категории можно выбрать в списке. "
+              "Также доступно мини-приложение с картой пунктов.\n\n"
+              "Ваш MAX ID: {}.")
+
 
 def show_all(name=None, get_in_dict=False):
-    all = get_all_homestays()
+    points = get_all_homestays()
     if get_in_dict:
-        return all
-    res = ""
-    for i in all:
-        res += (f"🆔 {i.id}\n"
-                f"🏠 Адрес: {i.address}\n{
-                f'🙅‍♂️ Занято: {i.available_beds}\n👤 Всего мест: {i.all_beds}\n' if i.all_beds > 0 else ''}"
-                f"{'🟢 Работает' if i.is_working else '🔴 Не работает'}\n"
-                f"⏳ Время работы: {i.open_time} - {i.close_time}\n"
-                f"ℹ Дополнительная информация: {i.additional_info}\n\n")
-    if not res:
-        res = ("Сейчас доступных точек нет(\n"
-               "Зайдите немного позже, возможно, ситуация изменится.")
-    return res
+        return points
+    if not points:
+        return "Пока нет доступных пунктов помощи."
+    return "\n\n".join(
+        f"🆔 {p.id}\n📍 {p.address}\n"
+        f"🏠 Мест: {p.available_beds}/{p.all_beds}\n"
+        f"{'🟢 Работает' if p.is_working else '🔴 Не работает'}"
+        for p in points
+    )
+
 
 def generate_buttons_by_user_privilege(usr, msg_id, me, no_edit=False):
-    keyboard = InlineKeyboardMarkup()
-    keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
-    keyboard.add_button("Изменить номер", button_types.callback, payload=json.dumps({
-        "command": "change_number",
-        "user": usr.id,
-        "msg_id": msg_id
-    }))
-    if no_edit:
-        return keyboard
-
-    if usr.user_type != 2 and usr.id != me and usr.id not in ADMINS:
-        keyboard.add_button("Сделать админом", button_types.callback, payload=json.dumps({
-            "command": "set_admin",
-            "user": usr.id,
-            "msg_id": msg_id
-        }))
-    if usr.user_type != 1 and usr.id != me and usr.id not in ADMINS:
-        keyboard.add_button("Сделать менеджером", button_types.callback, payload=json.dumps({
-            "command": "set_manager",
-            "user": usr.id,
-            "msg_id": msg_id
-        }))
-    if usr.user_type != 0 and usr.id != me and usr.id not in ADMINS:
-        keyboard.add_button("Отнять привилегии", button_types.callback, payload=json.dumps({
-            "command": "restrict_user",
-            "user": usr.id,
-            "msg_id": msg_id
-        }))
-    if usr.user_type in [1, 2]:
-        keyboard.add_button("Привязать к пункту", button_types.callback, payload=json.dumps({
-            "command": "attach_to_point",
-            "user": usr.id,
-            "msg_id": msg_id
-        }))
-    return keyboard
+    # Совместимость с прежними вызовами.
+    from maxbot.user_settings import profile_keyboard
+    return profile_keyboard(get_user(id=me),usr)
 
 
-async def do_on_start(bot, usr, msg_id = None):
-    global start_text
-    name = usr.get('first_name', None)
-    id = usr.get('user_id', None)
-    keyboard = InlineKeyboardMarkup()
-    usr = get_user(id)
-    if not usr:
-        usr = User(id, name, 0, "", -1)
-        insert_or_update_user(usr)
-
-    keyboard.add_button("Редактировать пользователя", button_types.callback, payload="edit_user")
-    if id in ADMINS or usr.user_type in [1, 2]:
-        keyboard.add_button("Редактировать пункт помощи", button_types.callback, payload="edit_homestay")
-        keyboard.add_button("Управление бронированиями", button_types.callback, payload="manage_bookings")
-    if name:
-        name = f", {name}"
-        text = start_text.format(name, id)
-    else:
-        text = start_text.format("", id)
-    keyboard.add_button("Мои бронирования", button_types.callback, payload="my_bookings")
-    keyboard.add_button("Отправить геопозицию", button_types.request_geo_location, payload="send_geo")
+async def do_on_start(bot, usr, msg_id=None):
+    user_id=usr.get('user_id')
+    if not user_id:
+        return
+    name=usr.get('first_name') or ''
+    account=get_user(id=user_id)
+    if not account:
+        account=User(id=user_id,username=name,user_type=0)
+        insert_or_update_user(account)
+    elif name and name!=account.username:
+        account.username=name
+        insert_or_update_user(account)
+    kb=InlineKeyboardMarkup()
+    kb.add_button('📍 Отправить геопозицию',button_types.request_geo_location,payload='send_geo')
+    kb.add_button('📋 Мои бронирования',button_types.callback,payload='my_bookings')
+    kb.add_button('🕘 История моих броней',button_types.callback,payload='my_booking_history')
+    kb.add_button('👤 Мой профиль' if account.user_type==0 else '👥 Пользователи / профиль',
+                  button_types.callback,payload='edit_user')
+    if access.is_global(account) or account.user_type==access.FUND_ADMIN:
+        kb.add_button('🏛️ Фонды',button_types.callback,payload='funds_panel')
+    if access.is_global(account) or account.user_type in (access.MANAGER,access.FUND_ADMIN):
+        kb.add_button('🏠 Управление пунктами',button_types.callback,payload='edit_homestay')
+        kb.add_button('✅ Управление бронированиями',button_types.callback,payload='manage_bookings')
+    text=start_text.format(f', {name}' if name else '',user_id)
     if msg_id:
-        await bot.edit_msg(msg_id, text, keyboard.keyboard)
+        await bot.edit_msg(msg_id,text,kb.keyboard)
     else:
-        msg_id = (await bot.send_msg(id, text, keyboard.keyboard)).get('message', {}).get('body', {}).get('mid')
-        bot.set_next_step(id,
-                          json.dumps({
-                              "command" : "edit_homestay",
-                              "msg_id" : msg_id
-                          }))
+        await bot.send_msg(user_id,text,kb.keyboard)
 
-    print(text)
+
 
 def safe_json_loads(string_data):
     if not string_data:

@@ -20,29 +20,55 @@ class Bot:
                      "Content-Type": "application/json",},
         )
 
-    async def send_msg(self, chat_id : int, text : str, btns: list = []):
-        """Send a message to chat"""
-
+    async def _send_single(self, chat_id: int, text: str, btns=None):
         body = {'text': text,
-                  'attachments': [
-                      {
-                          "type": "inline_keyboard",
-                          "payload": {
-                              "buttons": btns
-                          }
-                      }
-                  ] if btns else []}
-        print(body)
-        async with self.session.post(
-            f'{self.api_url}/messages',
-            params={'user_id': chat_id},
-            json=body,
-            ssl=self.ssl_context,
-        ) as response:
-            data = await response.json()
+                'attachments': [{'type': 'inline_keyboard',
+                                 'payload': {'buttons': btns}}] if btns else []}
+        async with self.session.post(f'{self.api_url}/messages',
+                                     params={'user_id':chat_id},json=body,
+                                     ssl=self.ssl_context) as response:
+            data=await response.json()
             if response.status != 200:
-                raise ConnectionMaxError(f"Error while sending message. Code: {response.status}")
+                raise ConnectionMaxError(f'Error while sending message. Code: {response.status}')
             return data
+
+    async def send_msg(self, chat_id: int, text: str, btns=None):
+        """Совместимо с API: его первое уведомление о новой заявке дублируется
+        ОСТАЛЬНЫМ менеджерам пункта (без правок api/http_server.py).
+        """
+        extra=[]
+        if btns and text.startswith('Новая заявка!'):
+            import json
+            from database.db_manager import get_booking, get_homestay_managers
+            for row in btns:
+                for button in row:
+                    try:
+                        payload=json.loads(button.get('payload') or '{}')
+                    except (ValueError,TypeError):
+                        continue
+                    if payload.get('command') != 'approve_booking':
+                        continue
+                    booking=get_booking(id=payload.get('booking_id'))
+                    if booking:
+                        extra=[m.id for m in get_homestay_managers(booking.homestay_id)
+                               if m.id != chat_id]
+                    break
+        result=None
+        first_error=None
+        try:
+            result=await self._send_single(chat_id,text,btns)
+        except Exception as error:
+            first_error=error
+        # Уведомление всем менеджерам, независимо от ошибки доставки первому.
+        if extra:
+            results=await asyncio.gather(*(self._send_single(uid,text,btns) for uid in extra),
+                                         return_exceptions=True)
+            for uid,status in zip(extra,results):
+                if isinstance(status,Exception):
+                    warnings.warn(f'Booking manager notification failed for {uid}: {status}')
+        if first_error:
+            raise first_error
+        return result
 
     async def edit_msg(self, message_id : int, text : str, btns: list = []):
         """Send a message to chat"""
