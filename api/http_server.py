@@ -17,6 +17,7 @@ from pydantic import BaseModel
 import jwt
 from fastapi.responses import FileResponse
 from database.db_manager import *
+from database.classes import HomestayTypes
 from maxbot.inline_keyboard import InlineKeyboardMarkup, button_types
 
 app = FastAPI(title="HOMELESSNESS API")
@@ -104,42 +105,51 @@ async def auth_mini_app(payload: AuthRequest):
 
 @app.get("/api/places")
 async def info(user_id: int = Depends(get_current_user_id)):
+    """Публичные данные пунктов + только собственная активная бронь пользователя.
+
+    Ключи прежнего API сохранены. Новые поля: fund, managers, category_label.
+    Служебные идентификаторы и роли менеджеров наружу не передаются.
     """
-    Защищенный эндпоинт. Доступен только с валидным JWT-токеном.
-    Заголовки запроса от фронта: Authorization: Bearer <token>
-    """
+    funds = {fund["id"]: fund for fund in get_funds()}
+    current_user = get_user(id=user_id)
+    own_bookings = {
+        booking.homestay_id: booking.to_json()
+        for booking in get_user_bookings(current_user)
+    } if current_user else {}
 
-    all_homestays = get_all_homestays()
-    answer = []
-    for homestay in all_homestays:
-        usr = get_user(id_homestay=homestay.id)
+    places = []
+    for point in get_all_homestays():
+        result = point.to_json()
+        fund = funds.get(point.fund_id)
+        managers = [
+            {
+                "name": manager.username or "Сотрудник пункта",
+                "phone": manager.phone_number or None,
+            }
+            for manager in get_homestay_managers(point.id)
+        ]
+        try:
+            category_label = HomestayTypes(point.homestay_type).label
+        except (ValueError, TypeError):
+            category_label = "Пункт помощи"
 
-        print(f"Address {homestay.address}, ({homestay.longtitude, homestay.latitude})")
-        res = homestay.to_json()
-        res["manager_info"] = {}
-        if usr:
-            res["manager_info"] = usr
+        result.update({
+            "fund": {
+                "name": fund["name"],
+                "description": fund["description"] or "",
+            } if fund else None,
+            "category_label": category_label,
+            "managers": managers,
+            # Для клиентов прежнего формата (без внутренних ID и ролей).
+            "manager_info": {
+                "username": managers[0]["name"],
+                "phone_number": managers[0]["phone"] or "",
+            } if managers else {},
+            "booking": own_bookings.get(point.id, {}),
+        })
+        places.append(result)
 
-        sender_user = get_user(id=user_id)
-        bookings = get_user_bookings(sender_user)
-        print(f"\nSENDER USER: {sender_user}\nBookings {bookings}\n")
-        res["booking"] = {}
-        if bookings:
-            for i in bookings:
-                if i.homestay_id == homestay.id:
-                    res["booking"] = i.to_json()
-                    break
-
-        answer.append(res)
-
-    print("REQUEST ANSWER: \n", {
-        "user_id": user_id,
-        "places" : answer,
-    })
-    return {
-        "user_id": user_id,
-        "places": answer
-    }
+    return {"user_id": user_id, "places": places}
 
 
 class BookingRequest(BaseModel):
@@ -200,30 +210,33 @@ async def book(booking: BookingRequest, user_id: int = Depends(get_current_user_
     user.last_booking = now.isoformat(timespec="seconds")
     insert_or_update_user(user)
     new_booking = Booking(user_id=user_id, homestay_id=homestay.id, date_time=now.isoformat(timespec="seconds"))
-    insert_or_update_booking(new_booking)
+    if not insert_or_update_booking(new_booking):
+        raise HTTPException(status_code=500, detail="Booking could not be created")
     homestay.available_beds -= 1
     insert_or_update_homestay(homestay)
-    manager = get_user(id_homestay=homestay.id)
-    if manager:
+    managers = get_homestay_managers(homestay.id)
+    if managers:
+        keyboard = InlineKeyboardMarkup()
+        horizontal_keyboard = InlineKeyboardMarkup()
+        horizontal_keyboard.add_button("✅ Подтвердить", button_types.callback, json.dumps({
+            "command": "approve_booking", "booking_id": new_booking.id,
+        }))
+        horizontal_keyboard.add_button("❌ Отклонить", button_types.callback, json.dumps({
+            "command": "delete_booking", "booking_id": new_booking.id,
+        }))
+        keyboard.add_buttons_one_line(horizontal_keyboard.keyboard)
+        message = (
+            "Новая заявка! Подтвердите её или она автоматически завершится.\n"
+            f"Пользователь: {user.username or 'Не указано'}\n"
+            f"Телефон: {user.phone_number or 'Номер телефона не указан'}\n\n"
+            f"{new_booking}"
+        )
+        # Bot.send_msg уже рассылает новые заявки остальным менеджерам
+        # выбранного пункта; второй цикл создал бы дубли уведомлений.
         try:
-            keyboard = InlineKeyboardMarkup()
-            horizontal_keyboard = InlineKeyboardMarkup()
-            horizontal_keyboard.add_button(f"✅ Подтвердить", button_types.callback, json.dumps({
-                "command": "approve_booking",
-                "booking_id": new_booking.id,
-            }))
-            horizontal_keyboard.add_button(f"❌ Отклонить", button_types.callback, json.dumps({
-                "command": "delete_booking",
-                "booking_id": new_booking.id,
-            }))
-            keyboard.add_buttons_one_line(horizontal_keyboard.keyboard)
-            await send_bot_msg(manager.id, text=(f"Новая заявка! "
-                                                 f"Подтвердите ее, или она автоматически удалится через 1 час.\n"
-                                                 f"Заявку оставил {user.username}\n"
-                                                 f"Контактный номер: {user.phone_number if user.phone_number else '-'}\n\n"
-                                                 f"Бронирование\n{new_booking}"), keyboard=keyboard.keyboard)
-        except Exception as e:
-            print("ERROR:", e)
+            await send_bot_msg(managers[0].id, text=message, keyboard=keyboard.keyboard)
+        except Exception as exc:
+            print(f"Не удалось отправить уведомления менеджерам: {exc}")
 
     try:
         keyboard = InlineKeyboardMarkup()
@@ -232,15 +245,15 @@ async def book(booking: BookingRequest, user_id: int = Depends(get_current_user_
             "booking_id": new_booking.id,
         }))
         keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
-        await send_bot_msg(user.id, text=(f"❗️ Вы забронировани место в пункте ❗️\n"
-                                    f"{new_booking}\n"
-                                    f"Приходите, мы Вас ждем! 😊"), keyboard=keyboard.keyboard)
+        await send_bot_msg(user.id, text=(f"📝 Заявка на бронирование отправлена\n"
+                                    f"{new_booking}\n\n"
+                                    "Ожидайте подтверждения менеджера."), keyboard=keyboard.keyboard)
     except Exception as e:
         print("ERROR:", e)
 
     return {
         "status": "success",
-        "message": f"User {user_id} booked homestay {booking.id_homestay}",
+        "message": "Заявка на бронирование создана",
         "last_booking": user.last_booking,
         "available_beds": homestay.available_beds,
         "booking_id": new_booking.id,
@@ -264,12 +277,15 @@ async def send_bot_msg(user_id: int, text: str, keyboard=None):
 DIST_DIR = Path(__file__).resolve().parents[1] / "Web" / "dist"
 
 if DIST_DIR.exists():
-    app.mount("/assets", StaticFiles(directory=DIST_DIR / "assets"), name="assets")
+    # Vite кладёт хэши в /assets; автономная ESM-сборка содержит /src и /vendor.
+    if (DIST_DIR / "assets").is_dir():
+        app.mount("/assets", StaticFiles(directory=DIST_DIR / "assets"), name="assets")
 
     @app.get("/{full_path:path}")
     async def spa(full_path: str):
-        file_path = DIST_DIR / full_path
-        if full_path and file_path.is_file():
+        # Не позволяем относительным путям выйти за пределы каталога сборки.
+        file_path = (DIST_DIR / full_path).resolve()
+        if full_path and file_path.is_relative_to(DIST_DIR.resolve()) and file_path.is_file():
             return FileResponse(file_path)
         return FileResponse(DIST_DIR / "index.html")
 

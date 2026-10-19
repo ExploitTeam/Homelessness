@@ -1,26 +1,11 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  type MouseEvent as ReactMouseEvent,
-  type TouchEvent as ReactTouchEvent,
-} from "react";
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type TouchEvent as ReactTouchEvent } from "react";
 
-import type { Hostel, UserLocation } from "../../types";
-import type {
-  BookingInfo,
-  ManagerInfo,
-} from "../../api/hostels";
-
-import {
-  findMetroRoute,
-  getNearestMetro,
-  getWalkingTime,
-  type MetroRoute,
-} from "../../utils/metro";
+import type { UserLocation } from "../../types";
+import type { HostelWithApiData } from "../../hooks/useHostels";
+import { findMetroRoute, getNearestMetro, getWalkingTime, type MetroRoute } from "../../utils/metro";
 
 interface HostelCardProps {
-  hostel: Hostel;
+  hostel: HostelWithApiData;
   userLocation: UserLocation;
   onClose: () => void;
   onShowRoute: (route: MetroRoute | null) => void;
@@ -28,932 +13,291 @@ interface HostelCardProps {
   onBook: (hostelId: number) => void | Promise<void>;
 }
 
-type HostelWithServerData = Hostel & {
-  managerInfo?: ManagerInfo | null;
-  booking?: BookingInfo | null;
-  homestayType?: number;
-};
-
-interface DragState {
-  active: boolean;
-  input: "mouse" | "touch" | null;
+type Drag = {
   startY: number;
   startOffset: number;
   currentOffset: number;
   maxOffset: number;
+  mode: "mouse" | "touch";
+};
+
+function distanceKm(a: UserLocation, b: UserLocation): number {
+  const toRad = (n: number) => (n * Math.PI) / 180;
+  const deltaLat = toRad(b.lat - a.lat);
+  const deltaLng = toRad(b.lng - a.lng);
+  const x = Math.sin(deltaLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(deltaLng / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
 }
 
-function getDistanceKm(
-  lat1: number,
-  lng1: number,
-  lat2: number,
-  lng2: number
-): number {
-  const R = 6371;
-
-  const lat1Rad = (lat1 * Math.PI) / 180;
-  const lat2Rad = (lat2 * Math.PI) / 180;
-
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1Rad) *
-      Math.cos(lat2Rad) *
-      Math.sin(dLng / 2) ** 2;
-
-  const c =
-    2 *
-    Math.atan2(
-      Math.sqrt(a),
-      Math.sqrt(1 - a)
-    );
-
-  return R * c;
+function formatDistance(value: number): string {
+  return value < 1 ? `${Math.round(value * 1000)} м` : `${value.toFixed(1).replace(".", ",")} км`;
 }
 
-function isCurrentlyOpen(
-  openTime: string,
-  closeTime: string
-): boolean {
-  if (!openTime || !closeTime) {
-    return false;
-  }
-
-  const now = new Date();
-
-  const moscowTime = new Intl.DateTimeFormat(
-    "ru-RU",
-    {
-      timeZone: "Europe/Moscow",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }
-  ).format(now);
-
-  const [currentHour, currentMinute] =
-    moscowTime.split(":").map(Number);
-
-  if (
-    Number.isNaN(currentHour) ||
-    Number.isNaN(currentMinute)
-  ) {
-    return false;
-  }
-
-  const currentMinutes =
-    currentHour * 60 + currentMinute;
-
-  const [openHour, openMinute] =
-    openTime.split(":").map(Number);
-
-  const [closeHour, closeMinute] =
-    closeTime.split(":").map(Number);
-
-  if (
-    Number.isNaN(openHour) ||
-    Number.isNaN(openMinute) ||
-    Number.isNaN(closeHour) ||
-    Number.isNaN(closeMinute)
-  ) {
-    return false;
-  }
-
-  const openMinutes =
-    openHour * 60 + openMinute;
-
-  const closeMinutes =
-    closeHour * 60 + closeMinute;
-
-  // 00:00 — 00:00 обычно означает круглосуточно.
-  if (openMinutes === closeMinutes) {
-    return true;
-  }
-
-  if (closeMinutes < openMinutes) {
-    return (
-      currentMinutes >= openMinutes ||
-      currentMinutes < closeMinutes
-    );
-  }
-
-  return (
-    currentMinutes >= openMinutes &&
-    currentMinutes < closeMinutes
-  );
+function formatDate(value: string): string {
+  const date = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(value);
+  return date ? `${date[3]}.${date[2]}.${date[1]} в ${date[4]}:${date[5]}` : value || "Не указана";
 }
 
-function formatServerDate(value: string): string {
-  if (!value) {
-    return "Не указано";
-  }
-
-  // Сервер присылает ISO без гарантированной timezone.
-  // Не сдвигаем время браузерной таймзоной, а показываем
-  // ровно то локальное время, которое пришло с backend.
-  const match = value.match(
-    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/
-  );
-
-  if (!match) {
-    return value;
-  }
-
-  const [, year, month, day, hour, minute] = match;
-  return `${day}.${month}.${year} ${hour}:${minute}`;
+function bookingStatus(value: number): string {
+  return value === 1 ? "Подтверждено" : "Ожидает подтверждения";
 }
 
-function getBookingStatus(booking: BookingInfo): string {
-  if (booking.is_approved === 1) {
-    return "Подтверждено";
-  }
-
-  if (booking.is_approved === 0) {
-    return "Ожидает подтверждения";
-  }
-
-  return `Статус: ${booking.is_approved}`;
+function getSchedule(open: string, close: string): string | null {
+  if (!open || !close) return null;
+  if (open.slice(0, 5) === close.slice(0, 5)) return "Круглосуточно";
+  return `${open.slice(0, 5)}–${close.slice(0, 5)}`;
 }
 
-export default function HostelCard({
-  hostel,
-  userLocation,
-  onClose,
-  onShowRoute,
-  booked,
-  onBook,
-}: HostelCardProps) {
+export default function HostelCard({ hostel, userLocation, onClose, onShowRoute, booked, onBook }: HostelCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
-
-  const dragRef = useRef<DragState>({
-    active: false,
-    input: null,
-    startY: 0,
-    startOffset: 0,
-    currentOffset: 0,
-    maxOffset: 0,
-  });
-
-  const [showContacts, setShowContacts] =
-    useState(false);
-
-  const [showRoute, setShowRoute] =
-    useState(false);
-
-  const [booking, setBooking] =
-    useState(false);
-
-  const [sheetCollapsed, setSheetCollapsed] =
-    useState(false);
-
-  const [sheetDragging, setSheetDragging] =
-    useState(false);
-
-  // Во время drag используем временный pixel-offset.
-  // В обычном состоянии позиция задаётся CSS-классом через translateY(calc(100% - peek)),
-  // поэтому автоматическое сворачивание вообще не зависит от измерений WebView.
-  const [dragOffset, setDragOffset] =
-    useState<number | null>(null);
-
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const contactsRef = useRef<HTMLElement>(null);
+  const dragRef = useRef<Drag | null>(null);
   const suppressClickRef = useRef(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [dragOffset, setDragOffset] = useState<number | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [showRoute, setShowRoute] = useState(false);
 
-  const [, setCurrentTime] =
-    useState(Date.now());
+  const isBooked = booked || hostel.booking !== null;
+  const canBook = !isBooked && hostel.bedsAvailable > 0;
+  const schedule = getSchedule(hostel.openTime || "", hostel.closeTime || "");
+  const distance = distanceKm(userLocation, { lat: hostel.lat, lng: hostel.lng });
 
-  const hostelData = hostel as HostelWithServerData;
-  const managerInfo = hostelData.managerInfo ?? null;
-  const serverBooking = hostelData.booking ?? null;
-
-  const isBooked = booked || serverBooking !== null;
-
-  const getSheetPeekHeight = (): number => {
-    const element = cardRef.current;
-
-    if (!element) {
-      return 72;
-    }
-
-    const rawValue = window
-      .getComputedStyle(element)
-      .getPropertyValue("--hostel-sheet-peek");
-
-    const parsed = Number.parseFloat(rawValue);
-    return Number.isFinite(parsed) ? parsed : 72;
-  };
-
-  const getCollapsedOffset = (): number => {
-    const height = cardRef.current?.getBoundingClientRect().height ?? 0;
-    return Math.max(0, height - getSheetPeekHeight());
-  };
-
-  const setSheetPosition = (collapsed: boolean) => {
-    setDragOffset(null);
-    setSheetCollapsed(collapsed);
-  };
-
-  const suppressSyntheticClick = () => {
-    suppressClickRef.current = true;
-
-    window.setTimeout(() => {
-      suppressClickRef.current = false;
-    }, 350);
-  };
+  const pointMetro = getNearestMetro(hostel.lat, hostel.lng);
+  const userMetro = getNearestMetro(userLocation.lat, userLocation.lng);
+  const metroAvailable =
+    distanceKm(userLocation, { lat: userMetro.lat, lng: userMetro.lng }) <= 20 &&
+    distanceKm({ lat: hostel.lat, lng: hostel.lng }, { lat: pointMetro.lat, lng: pointMetro.lng }) <= 20;
+  const metroRoute = metroAvailable ? findMetroRoute(userMetro, pointMetro) : null;
 
   useEffect(() => {
-    setShowContacts(false);
-    setShowRoute(false);
-    setBooking(false);
-    setSheetCollapsed(false);
+    setCollapsed(false);
     setDragOffset(null);
-    dragRef.current.currentOffset = 0;
+    setShowRoute(false);
     onShowRoute(null);
+    scrollRef.current?.scrollTo({ top: 0 });
   }, [hostel.id, onShowRoute]);
 
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      setCurrentTime(Date.now());
-    }, 30000);
+  function openContacts() {
+    setCollapsed(false);
+    const scroll = scrollRef.current;
+    const target = contactsRef.current;
+    if (!scroll || !target) return;
+    const top = target.getBoundingClientRect().top - scroll.getBoundingClientRect().top + scroll.scrollTop - 14;
+    scroll.scrollTo({ top, behavior: "smooth" });
+  }
 
-    return () => {
-      window.clearInterval(interval);
-    };
-  }, []);
-
-  const currentlyOpen =
-    hostel.isWorking &&
-    isCurrentlyOpen(
-      hostel.openTime,
-      hostel.closeTime
-    );
-
-  const distance = getDistanceKm(
-    userLocation.lat,
-    userLocation.lng,
-    hostel.lat,
-    hostel.lng
-  );
-
-  const nearestMetro = getNearestMetro(
-    hostel.lat,
-    hostel.lng
-  );
-
-  const userMetro = getNearestMetro(
-    userLocation.lat,
-    userLocation.lng
-  );
-
-  const userToMetroDistance = getDistanceKm(
-    userLocation.lat,
-    userLocation.lng,
-    userMetro.lat,
-    userMetro.lng
-  );
-
-  const hostelToMetroDistance = getDistanceKm(
-    hostel.lat,
-    hostel.lng,
-    nearestMetro.lat,
-    nearestMetro.lng
-  );
-
-  // Не пытаемся строить маршрут Московского метро для тестовых
-  // пунктов в Петербурге, Омске, Краснодаре и других городах.
-  const metroAvailable =
-    userToMetroDistance <= 20 &&
-    hostelToMetroDistance <= 20;
-
-  const metroRoute = metroAvailable
-    ? findMetroRoute(userMetro, nearestMetro)
-    : null;
-
-  const userMetroWalkingTime = metroAvailable
-    ? getWalkingTime(
-        userLocation.lat,
-        userLocation.lng,
-        userMetro
-      )
-    : 0;
-
-  const walkingTime = metroAvailable
-    ? getWalkingTime(
-        hostel.lat,
-        hostel.lng,
-        nearestMetro
-      )
-    : 0;
-
-  const handleBook = async () => {
-    if (booking || isBooked) {
-      return;
-    }
-
-    setBooking(true);
-
+  async function submitBooking() {
+    if (!canBook || saving) return;
+    setSaving(true);
     try {
       await onBook(hostel.id);
     } finally {
-      setBooking(false);
+      setSaving(false);
     }
-  };
+  }
 
-  const handleRoute = () => {
-    if (!metroRoute) {
-      return;
-    }
+  function toggleRoute() {
+    if (!metroRoute) return;
+    const next = !showRoute;
+    setShowRoute(next);
+    onShowRoute(next ? metroRoute : null);
+    if (next) setCollapsed(true);
+  }
 
-    if (showRoute) {
-      setShowRoute(false);
-      onShowRoute(null);
-      return;
-    }
-
-    setShowRoute(true);
-    onShowRoute(metroRoute);
-
-    // Сворачиваем сразу. CSS использует процент от собственной высоты карточки,
-    // поэтому здесь нет ни requestAnimationFrame, ни измерения offsetHeight.
-    // Это одинаково работает в браузере, MAX Desktop/Web и мобильном WebView.
-    if (cardRef.current) {
-      cardRef.current.scrollTop = 0;
-    }
-
-    setSheetPosition(true);
-  };
-
-  const handleContacts = () => {
-    setShowContacts((current) => !current);
-    setSheetPosition(false);
-
-    if (cardRef.current) {
-      cardRef.current.scrollTop = 0;
-    }
-  };
-
-  const beginSheetDrag = (
-    clientY: number,
-    input: "mouse" | "touch"
-  ) => {
-    const maxOffset = getCollapsedOffset();
-    const startOffset = sheetCollapsed ? maxOffset : 0;
-
-    dragRef.current = {
-      active: true,
-      input,
-      startY: clientY,
-      startOffset,
-      currentOffset: startOffset,
-      maxOffset,
-    };
-
+  // Двигается только специальная верхняя ручка; прокрутка текста, контактов
+  // и нажатия на нижние кнопки не конфликтуют с перемещением карточки.
+  function beginDrag(clientY: number, mode: Drag["mode"]) {
+    const height = cardRef.current?.getBoundingClientRect().height ?? 0;
+    const maxOffset = Math.max(0, height - 108);
+    const startOffset = collapsed ? maxOffset : 0;
+    dragRef.current = { startY: clientY, startOffset, currentOffset: startOffset, maxOffset, mode };
     setDragOffset(startOffset);
-    setSheetDragging(true);
-  };
+    setDragging(true);
+  }
 
-  const updateSheetDrag = (clientY: number) => {
-    const state = dragRef.current;
-
-    if (!state.active) {
-      return;
-    }
-
-    const delta = clientY - state.startY;
-    const next = Math.min(
-      state.maxOffset,
-      Math.max(0, state.startOffset + delta)
-    );
-
-    state.currentOffset = next;
-    setDragOffset(next);
-  };
-
-  const finishSheetDragAt = (clientY: number) => {
-    const state = dragRef.current;
-
-    if (!state.active) {
-      return;
-    }
-
-    const delta = clientY - state.startY;
-    const movement = Math.abs(delta);
-
-    state.active = false;
-    state.input = null;
-    setSheetDragging(false);
-    setDragOffset(null);
-
-    if (movement <= 10) {
-      // Короткое нажатие всегда переключает карточку.
-      // Это происходит уже на mouseup/touchend и не зависит от события click,
-      // которое MAX WebView иногда подавляет.
-      setSheetCollapsed((current) => !current);
-      suppressSyntheticClick();
-      return;
-    }
-
-    const collapse =
-      delta > 44 ||
-      (delta >= -44 &&
-        state.currentOffset > state.maxOffset / 2);
-
-    setSheetCollapsed(collapse);
-    suppressSyntheticClick();
-
-    if (!collapse && cardRef.current) {
-      cardRef.current.scrollTop = 0;
-    }
-  };
-
-  const handleSheetMouseDown = (
-    event: ReactMouseEvent<HTMLDivElement>
-  ) => {
-    if (event.button !== 0) {
-      return;
-    }
-
-    // Не полагаемся на Pointer Events / setPointerCapture: MAX Desktop
-    // может обрабатывать их иначе. Mouse drag отслеживается на window.
-    event.preventDefault();
-    beginSheetDrag(event.clientY, "mouse");
-  };
-
-  const handleSheetTouchStart = (
-    event: ReactTouchEvent<HTMLDivElement>
-  ) => {
-    const touch = event.touches[0];
-
-    if (!touch) {
-      return;
-    }
-
-    // preventDefault здесь не нужен: touch-action:none задаётся CSS.
-    // Это важно для встроенных WebView, которые могут отменять последующие события.
-    beginSheetDrag(touch.clientY, "touch");
-  };
-
-  const handleSheetClick = () => {
-    // Обычный click — дополнительный fallback для браузеров.
-    // Основное переключение уже происходит на mouseup/touchend.
-    if (suppressClickRef.current) {
-      return;
-    }
-
-    setSheetCollapsed((current) => !current);
-  };
-
-  /*
-   * Mouse и touch слушаем на window, а не только на самой ручке.
-   * Поэтому жест не обрывается, если курсор/палец вышел за пределы карточки.
-   */
   useEffect(() => {
-    const handleMouseMove = (event: MouseEvent) => {
-      const state = dragRef.current;
-
-      if (!state.active || state.input !== "mouse") {
-        return;
-      }
-
+    function move(clientY: number) {
+      const drag = dragRef.current;
+      if (!drag) return;
+      drag.currentOffset = Math.min(drag.maxOffset, Math.max(0, drag.startOffset + clientY - drag.startY));
+      setDragOffset(drag.currentOffset);
+    }
+    function finish(clientY: number) {
+      const drag = dragRef.current;
+      if (!drag) return;
+      dragRef.current = null;
+      setDragging(false);
+      setDragOffset(null);
+      const delta = clientY - drag.startY;
+      setCollapsed(Math.abs(delta) < 10 ? !collapsed : delta > 45 || (delta >= -45 && drag.currentOffset > drag.maxOffset / 2));
+      suppressClickRef.current = true;
+      window.setTimeout(() => { suppressClickRef.current = false; }, 350);
+    }
+    const onMouseMove = (event: MouseEvent) => {
+      if (dragRef.current?.mode !== "mouse") return;
       event.preventDefault();
-      updateSheetDrag(event.clientY);
+      move(event.clientY);
     };
-
-    const handleMouseUp = (event: MouseEvent) => {
-      const state = dragRef.current;
-
-      if (!state.active || state.input !== "mouse") {
-        return;
-      }
-
-      finishSheetDragAt(event.clientY);
+    const onMouseUp = (event: MouseEvent) => {
+      if (dragRef.current?.mode === "mouse") finish(event.clientY);
     };
-
-    const handleTouchMove = (event: TouchEvent) => {
-      const state = dragRef.current;
-
-      if (!state.active || state.input !== "touch") {
-        return;
-      }
-
+    const onTouchMove = (event: TouchEvent) => {
+      if (dragRef.current?.mode !== "touch") return;
       const touch = event.touches[0];
-
-      if (!touch) {
-        return;
-      }
-
-      event.preventDefault();
-      updateSheetDrag(touch.clientY);
+      if (touch) { event.preventDefault(); move(touch.clientY); }
     };
-
-    const handleTouchEnd = (event: TouchEvent) => {
-      const state = dragRef.current;
-
-      if (!state.active || state.input !== "touch") {
-        return;
-      }
-
-      const touch = event.changedTouches[0];
-      finishSheetDragAt(touch?.clientY ?? state.startY);
+    const onTouchEnd = (event: TouchEvent) => {
+      if (dragRef.current?.mode === "touch") finish(event.changedTouches[0]?.clientY ?? dragRef.current.startY);
     };
-
-    window.addEventListener("mousemove", handleMouseMove, {
-      passive: false,
-    });
-    window.addEventListener("mouseup", handleMouseUp);
-    window.addEventListener("touchmove", handleTouchMove, {
-      passive: false,
-    });
-    window.addEventListener("touchend", handleTouchEnd);
-    window.addEventListener("touchcancel", handleTouchEnd);
-
+    window.addEventListener("mousemove", onMouseMove, { passive: false });
+    window.addEventListener("mouseup", onMouseUp);
+    window.addEventListener("touchmove", onTouchMove, { passive: false });
+    window.addEventListener("touchend", onTouchEnd);
+    window.addEventListener("touchcancel", onTouchEnd);
     return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-      window.removeEventListener("touchmove", handleTouchMove);
-      window.removeEventListener("touchend", handleTouchEnd);
-      window.removeEventListener("touchcancel", handleTouchEnd);
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", onTouchEnd);
+      window.removeEventListener("touchcancel", onTouchEnd);
     };
-  });
+  }, [collapsed]);
+
+  function dragMouseDown(event: ReactMouseEvent<HTMLButtonElement>) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    beginDrag(event.clientY, "mouse");
+  }
+  function dragTouchStart(event: ReactTouchEvent<HTMLButtonElement>) {
+    if (event.touches[0]) beginDrag(event.touches[0].clientY, "touch");
+  }
 
   return (
-    <div
+    <article
       ref={cardRef}
-      className={`hostel-card ${
-        sheetDragging ? "hostel-card--dragging" : ""
-      } ${
-        sheetCollapsed ? "hostel-card--collapsed" : "hostel-card--expanded"
-      }`}
-      style={
-        dragOffset !== null
-          ? {
-              transform: `translate3d(-50%, ${dragOffset}px, 0)`,
-            }
-          : undefined
-      }
+      className={`place-sheet${collapsed ? " place-sheet--collapsed" : ""}${dragging ? " place-sheet--dragging" : ""}`}
+      style={dragOffset === null ? undefined : { transform: `translate3d(-50%, ${dragOffset}px, 0)` }}
+      aria-label={`Информация о пункте: ${hostel.address}`}
     >
-      <div
-        className="hostel-card__sheet-hitbox"
-        role="button"
-        tabIndex={0}
-        aria-label={
-          sheetCollapsed
-            ? "Развернуть карточку"
-            : "Свернуть карточку"
-        }
-        onMouseDown={handleSheetMouseDown}
-        onTouchStart={handleSheetTouchStart}
-        onClick={handleSheetClick}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            setSheetPosition(!sheetCollapsed);
-          }
-        }}
-      />
-
-      <div
-        className="hostel-card__sheet-handle-area"
-        aria-hidden="true"
-      >
-        <span className="hostel-card__sheet-handle" />
-      </div>
-
       <button
         type="button"
-        className="hostel-card__close"
-        onClick={onClose}
-        aria-label="Закрыть"
+        className="place-sheet__handle-control"
+        aria-label={collapsed ? "Развернуть карточку пункта" : "Свернуть карточку пункта"}
+        aria-expanded={!collapsed}
+        onMouseDown={dragMouseDown}
+        onTouchStart={dragTouchStart}
+        onClick={() => {
+          if (!suppressClickRef.current) setCollapsed((current) => !current);
+        }}
       >
-        ×
+        <span className="place-sheet__handle" aria-hidden="true" />
       </button>
 
-      {!showContacts ? (
-        <div className="hostel-card__content hostel-card__content--main">
-          <h2>{hostel.name}</h2>
+      <div className="place-sheet__topline">
+        <div className="place-sheet__heading">
+          <span className="place-sheet__eyebrow">ПУНКТ ПОМОЩИ</span>
+          <h2>{hostel.categoryLabel}</h2>
+          <p>📍 {hostel.address}</p>
+        </div>
+        <button type="button" className="place-sheet__close" onClick={onClose} aria-label="Закрыть карточку">×</button>
+      </div>
 
-          <p className="hostel-card__address">
-            📍 {hostel.address}
-          </p>
-
-          <div
-            className={`hostel-card__working ${
-              currentlyOpen
-                ? "hostel-card__working--open"
-                : "hostel-card__working--closed"
-            }`}
-          >
-            <span className="hostel-card__working-icon">
-              {currentlyOpen ? "🟢" : "🔴"}
-            </span>
-
-            <div className="hostel-card__working-text">
-              <strong>
-                {currentlyOpen
-                  ? "Сейчас работает"
-                  : "Сейчас закрыто"}
-              </strong>
-
-              {hostel.openTime &&
-                hostel.closeTime && (
-                  <small>
-                    🕐 {hostel.openTime} —{" "}
-                    {hostel.closeTime}
-                  </small>
-                )}
-            </div>
+      <div ref={scrollRef} className="place-sheet__scroll">
+        <div className="place-sheet__overview">
+          <div className={`place-sheet__status${hostel.isWorking ? " place-sheet__status--active" : ""}`}>
+            <span aria-hidden="true">●</span>
+            {hostel.isWorking ? "Пункт работает" : "Пункт временно не работает"}
           </div>
-
-          <div className="hostel-card__distance">
-            <span>🚶</span>
-            <span>Расстояние:</span>
-            <strong>
-              {distance < 1
-                ? `${Math.round(distance * 1000)} м`
-                : `${distance.toFixed(1)} км`}
-            </strong>
-          </div>
-
-          <div className="hostel-card__info">
-            🛏 Свободных мест:{" "}
-            <strong>{hostel.bedsAvailable}</strong>{" "}
-            из {hostel.bedsTotal}
-          </div>
-
-          {serverBooking && (
-            <div className="hostel-card__booking-banner">
-              <span>🎫</span>
-              <div>
-                <strong>У вас есть бронирование</strong>
-                <small>
-                  {getBookingStatus(serverBooking)} ·{" "}
-                  {formatServerDate(
-                    serverBooking.date_time
-                  )}
-                </small>
-              </div>
-            </div>
-          )}
-
-          <div className="hostel-card__metro">
-            <div className="hostel-card__metro-title">
-              🚇 Как добраться на метро
-            </div>
-
-            {!metroAvailable ? (
-              <div className="hostel-card__metro-unavailable">
-                <span>ℹ️</span>
-                <div>
-                  <strong>Маршрут метро недоступен</strong>
-                  <small>
-                    Этот пункт или ваше текущее местоположение находятся
-                    далеко от Московского метро.
-                  </small>
-                </div>
-              </div>
-            ) : (
-              <>
-              <div className="hostel-card__metro-route">
-                <div className="hostel-card__metro-point">
-                  <span>📍</span>
-
-                  <div>
-                    <small>
-                      Ближайшая станция к вам
-                    </small>
-
-                    <strong>{userMetro.name}</strong>
-
-                    <span>
-                      {userMetro.lines.join(" / ")}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="hostel-card__metro-arrow">
-                  ↓
-                </div>
-
-                <div className="hostel-card__metro-point">
-                  <span>🏠</span>
-
-                  <div>
-                    <small>
-                      Ближайшая к ночлежке
-                    </small>
-
-                    <strong>{nearestMetro.name}</strong>
-
-                    <span>
-                      {nearestMetro.lines.join(" / ")}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="hostel-card__metro-walk">
-                🚶 До станции от вас примерно{" "}
-                {userMetroWalkingTime} мин
-              </div>
-
-              <div className="hostel-card__metro-walk">
-                🚶 От станции до ночлежки примерно{" "}
-                {walkingTime} мин
-              </div>
-
-              {metroRoute && (
-                <button
-                  type="button"
-                  className="hostel-card__route-button"
-                  onClick={handleRoute}
-                >
-                  {showRoute
-                    ? "✕ Скрыть маршрут с карты"
-                    : "🚇 Показать маршрут на карте"}
-                </button>
-              )}
-
-              {showRoute && metroRoute && (
-                <div className="hostel-card__route-status">
-                  <span>✓</span>
-                  <div>
-                    <strong>
-                      Маршрут отображается на карте
-                    </strong>
-                    <small>
-                      {metroRoute.durationMinutes > 0 &&
-                        `≈ ${metroRoute.durationMinutes} мин`}
-                      {metroRoute.durationMinutes > 0 &&
-                        metroRoute.transferCount > 0 &&
-                        " · "}
-                      {metroRoute.transferCount > 0 &&
-                        `${metroRoute.transferCount} ${
-                          metroRoute.transferCount === 1
-                            ? "пересадка"
-                            : metroRoute.transferCount < 5
-                              ? "пересадки"
-                              : "пересадок"
-                        }`}
-                    </small>
-                  </div>
-                </div>
-              )}
-              </>
-            )}
-          </div>
-
-          <p className="hostel-card__description">
-            {hostel.description ||
-              "Дополнительная информация отсутствует."}
-          </p>
-
-          <div className="hostel-card__buttons">
-            <button
-              type="button"
-              className={`hostel-card__book ${
-                isBooked
-                  ? "hostel-card__book--success"
-                  : ""
-              }`}
-              onClick={handleBook}
-              disabled={
-                booking ||
-                isBooked ||
-                hostel.bedsAvailable <= 0
-              }
-            >
-              {booking
-                ? "Бронируем..."
-                : isBooked
-                  ? "Забронировано ✓"
-                  : hostel.bedsAvailable <= 0
-                    ? "Мест нет"
-                    : "Забронировать"}
-            </button>
-
-            <button
-              type="button"
-              className="hostel-card__contacts"
-              onClick={handleContacts}
-            >
-              ☎ Контакты и бронь
-            </button>
+          <div className="place-sheet__facts">
+            <div><span className="place-sheet__fact-icon">↗</span><small>Расстояние по прямой</small><strong>{formatDistance(distance)}</strong></div>
+            <div><span className="place-sheet__fact-icon">🛏️</span><small>Свободных мест</small><strong>{hostel.bedsTotal > 0 ? `${hostel.bedsAvailable} из ${hostel.bedsTotal}` : "Не указано"}</strong></div>
+            <div><span className="place-sheet__fact-icon">🕒</span><small>Время работы</small><strong>{schedule ?? "Уточняйте"}</strong></div>
           </div>
         </div>
-      ) : (
-        <div className="hostel-card__content hostel-card__content--contacts">
-          <div className="hostel-card__contacts-icon">
-            ☎
+
+        <section className="place-sheet__section place-sheet__fund" aria-labelledby="place-fund-title">
+          <div className="place-sheet__section-title"><span aria-hidden="true">🤝</span><h3 id="place-fund-title">Организация</h3></div>
+          <div className="place-sheet__fund-content">
+            <span className="place-sheet__meta-label">Благотворительный фонд</span>
+            <strong className="place-sheet__fund-name">{hostel.fund?.name || "Фонд не указан"}</strong>
+            {hostel.fund?.description ? (
+              <p className="place-sheet__description">{hostel.fund.description}</p>
+            ) : (
+              <p className="place-sheet__muted">Описание фонда пока не добавлено.</p>
+            )}
           </div>
+        </section>
 
-          <h2>Контакты и бронирование</h2>
+        <section className="place-sheet__section" aria-labelledby="place-about-title">
+          <div className="place-sheet__section-title"><span aria-hidden="true">📋</span><h3 id="place-about-title">О пункте</h3></div>
+          <p className={hostel.description ? "place-sheet__description" : "place-sheet__muted"}>
+            {hostel.description || "Дополнительная информация о пункте пока не указана."}
+          </p>
+        </section>
 
-          <section className="hostel-card__details-section">
-            <h3>Менеджер пункта</h3>
+        {hostel.booking && (
+          <section className="place-sheet__section place-sheet__booking" aria-labelledby="place-booking-title">
+            <div className="place-sheet__section-title"><span aria-hidden="true">🎟️</span><h3 id="place-booking-title">Моя бронь</h3></div>
+            <p className="place-sheet__booking-status">{bookingStatus(hostel.booking.is_approved)}</p>
+            <p>Заявка №{hostel.booking.id} · {formatDate(hostel.booking.date_time)}</p>
+          </section>
+        )}
 
-            {managerInfo ? (
-              <div className="hostel-card__details-card">
-                <div className="hostel-card__contact-item">
-                  <span>👤</span>
-                  <div>
-                    <small>Имя</small>
-                    <strong>
-                      {managerInfo.username ||
-                        "Не указано"}
-                    </strong>
-                  </div>
-                </div>
-
-                <div className="hostel-card__contact-item">
-                  <span>📞</span>
-                  <div>
-                    <small>Телефон</small>
-                    {managerInfo.phone_number ? (
-                      <a
-                        href={`tel:${managerInfo.phone_number}`}
-                      >
-                        {managerInfo.phone_number}
-                      </a>
+        <section ref={contactsRef} className="place-sheet__section place-sheet__contacts" aria-labelledby="place-contacts-title">
+          <div className="place-sheet__section-title"><span aria-hidden="true">☎️</span><h3 id="place-contacts-title">Контакты пункта</h3></div>
+          {hostel.managers.length === 0 ? (
+            <p className="place-sheet__muted">Контактные лица пока не указаны.</p>
+          ) : (
+            <div className="place-sheet__managers">
+              {hostel.managers.map((manager, index) => (
+                <div className="place-sheet__manager" key={`${index}-${manager.name}`}>
+                  <div className="place-sheet__manager-avatar" aria-hidden="true">👤</div>
+                  <div className="place-sheet__manager-details">
+                    <strong>{manager.name || "Сотрудник пункта"}</strong>
+                    <span>Контактное лицо</span>
+                    {manager.phone ? (
+                      <a href={`tel:${manager.phone.replace(/[^\d+]/g, "")}`}>📞 {manager.phone}</a>
                     ) : (
-                      <strong>Не указан</strong>
+                      <small>Номер телефона не указан</small>
                     )}
                   </div>
                 </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="place-sheet__section" aria-labelledby="place-route-title">
+          <div className="place-sheet__section-title"><span aria-hidden="true">🗺️</span><h3 id="place-route-title">Как добраться</h3></div>
+          <details className="place-sheet__route-details">
+            <summary>Маршрут на метро <span aria-hidden="true">⌄</span></summary>
+            {metroAvailable && metroRoute ? (
+              <div className="place-sheet__route-content">
+                <p><strong>От:</strong> {userMetro.name} <small>({getWalkingTime(userLocation.lat, userLocation.lng, userMetro)} мин пешком до станции)</small></p>
+                <p><strong>До:</strong> {pointMetro.name} <small>({getWalkingTime(hostel.lat, hostel.lng, pointMetro)} мин пешком до пункта)</small></p>
+                <button type="button" className="place-sheet__route-button" onClick={toggleRoute}>
+                  {showRoute ? "Скрыть маршрут с карты" : "Показать на карте"}
+                </button>
               </div>
-            ) : (
-              <div className="hostel-card__empty-state">
-                <span>ℹ️</span>
-                <div>
-                  <strong>
-                    Менеджер пока не назначен
-                  </strong>
-                  <small>
-                    Контактные данные менеджера пока не указаны.
-                  </small>
-                </div>
-              </div>
-            )}
-          </section>
+            ) : <p className="place-sheet__muted">Маршрут Московского метро для этого пункта недоступен.</p>}
+          </details>
+        </section>
+      </div>
 
-          <section className="hostel-card__details-section">
-            <h3>Ваше бронирование</h3>
-
-            {serverBooking ? (
-              <div className="hostel-card__details-card">
-                <div className="hostel-card__contact-item">
-                  <span>🎫</span>
-                  <div>
-                    <small>Статус</small>
-                    <strong>
-                      {getBookingStatus(serverBooking)}
-                    </strong>
-                  </div>
-                </div>
-
-                <div className="hostel-card__contact-item">
-                  <span>🕐</span>
-                  <div>
-                    <small>Дата бронирования</small>
-                    <strong>
-                      {formatServerDate(
-                        serverBooking.date_time
-                      )}
-                    </strong>
-                  </div>
-                </div>
-
-                <div className="hostel-card__contact-item">
-                  <span>№</span>
-                  <div>
-                    <small>Номер бронирования</small>
-                    <strong>{serverBooking.id}</strong>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="hostel-card__empty-state">
-                <span>ℹ️</span>
-                <div>
-                  <strong>
-                    Бронирования этого пункта нет
-                  </strong>
-                  <small>
-                    Вы ещё не бронировали место в этом пункте.
-                  </small>
-                </div>
-              </div>
-            )}
-          </section>
-
-          <button
-            type="button"
-            className="hostel-card__back"
-            onClick={handleContacts}
-          >
-            ← Назад
-          </button>
-        </div>
-      )}
-    </div>
+      <footer className="place-sheet__actions" aria-label="Действия с пунктом">
+        <button type="button" className="place-sheet__contact-button" onClick={openContacts}>☎️ Контакты</button>
+        <button
+          type="button"
+          className={`place-sheet__book-button${isBooked ? " place-sheet__book-button--booked" : ""}`}
+          disabled={saving || !canBook}
+          onClick={submitBooking}
+        >
+          {saving ? "Отправляем…" : isBooked ? "✓ Заявка подана" : hostel.bedsAvailable <= 0 ? "Нет мест" : "Забронировать"}
+        </button>
+      </footer>
+    </article>
   );
 }

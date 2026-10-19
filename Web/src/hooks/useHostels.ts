@@ -10,11 +10,16 @@ import {
   type BackendPlace,
   type BookingInfo,
   type ManagerInfo,
+  type FundInfo,
+  type PublicManager,
 } from "../api/hostels";
 import type { Hostel } from "../types";
 
 export type HostelWithApiData = Hostel & {
   managerInfo: ManagerInfo | null;
+  managers: PublicManager[];
+  fund: FundInfo | null;
+  categoryLabel: string;
   booking: BookingInfo | null;
   homestayType: number;
 };
@@ -32,7 +37,6 @@ function hasManagerInfo(
   return (
     typeof value === "object" &&
     value !== null &&
-    "id" in value &&
     "username" in value &&
     "phone_number" in value
   );
@@ -62,6 +66,14 @@ function mapBackendPlace(
   const booking = hasBookingInfo(place.booking)
     ? place.booking
     : null;
+  const managers = Array.isArray(place.managers)
+    ? place.managers.filter((manager) =>
+        typeof manager.name === "string"
+      )
+    : managerInfo
+      ? [{ name: managerInfo.username || "Сотрудник пункта", phone: managerInfo.phone_number || null }]
+      : [];
+  const categoryLabel = place.category_label?.trim() || "Пункт помощи";
 
   return {
     id: place.id,
@@ -69,7 +81,7 @@ function mapBackendPlace(
     lat: place.latitude as number,
     lng: place.longtitude as number,
 
-    name: place.address || `Пункт №${place.id}`,
+    name: categoryLabel,
     address: place.address || "Адрес не указан",
 
     bedsAvailable: place.available_beds,
@@ -83,11 +95,14 @@ function mapBackendPlace(
     description: place.additional_info ?? "",
 
     // Старые поля сохраняем для совместимости со старым UI.
-    phone: managerInfo?.phone_number ?? "",
+    phone: managers[0]?.phone ?? "",
     email: "",
 
     // Реальные данные из /api/places.
     managerInfo,
+    managers,
+    fund: place.fund ?? null,
+    categoryLabel,
     booking,
     homestayType: place.homestay_type,
   };
@@ -139,12 +154,12 @@ export function useHostels(): UseHostelsResult {
         return;
       }
 
-      console.error("Ошибка загрузки ночлежек:", err);
+      console.error("Ошибка загрузки пунктов помощи:", err);
 
       setError(
         err instanceof Error
           ? err.message
-          : "Не удалось загрузить ночлежки"
+          : "Не удалось загрузить пункты помощи"
       );
     } finally {
       if (

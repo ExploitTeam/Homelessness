@@ -9,10 +9,6 @@ import { createPortal } from "react-dom";
 
 import "./App.css";
 
-import {
-  getMaxUser,
-  isRunningInsideMax,
-} from "./api/max";
 
 import MoscowMap from "./components/Map/MoscowMap";
 import HostelCard from "./components/HostelCard/HostelCard";
@@ -63,12 +59,6 @@ function App() {
           ) ?? null,
     [hostels, selectedHostelId]
   );
-
-  useEffect(() => {
-    console.log("MAX:", isRunningInsideMax());
-    console.log("MAX user:", getMaxUser());
-    console.log("MAX initData:", window.WebApp?.initData);
-  }, []);
 
   useEffect(() => {
     return () => {
@@ -146,14 +136,13 @@ function App() {
 
         showBookingMessage({
           type: "success",
-          text: "Место успешно забронировано!",
+          text: "Заявка отправлена. Подтверждение появится в боте.",
         });
 
         /*
          * /api/places — источник истины для количества мест,
-         * manager_info и booking. После успешной брони сразу
-         * перечитываем пункты, поэтому вкладка "Контакты и бронь"
-         * обновляется без перезагрузки страницы.
+         * списка менеджеров и активной брони. После создания заявки
+         * обновляем карточку без перезагрузки мини-приложения.
          */
         try {
           await reloadHostels();

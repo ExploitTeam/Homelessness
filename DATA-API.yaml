@@ -48,6 +48,9 @@ checks:
     - homestay_type
     - longtitude
     - latitude
+    - fund
+    - category_label
+    - managers
     - manager_info
     - booking
 - id: book

@@ -896,3 +896,308 @@ button {
   font-size: 12px;
   line-height: 17px;
 }
+
+/* =========================
+   MINI APP V4 · КАРТОЧКА ПУНКТА
+   ========================= */
+
+.place-sheet {
+  position: fixed;
+  z-index: 1000;
+  left: 50%;
+  bottom: 12px;
+  width: min(490px, calc(100% - 24px));
+  height: min(81dvh, 770px);
+  max-height: calc(100dvh - 20px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 24px;
+  border: 1px solid rgba(13, 51, 47, 0.09);
+  background: #fff;
+  color: #193331;
+  box-shadow: 0 16px 55px rgba(0, 42, 40, 0.22), 0 4px 12px rgba(0, 0, 0, 0.06);
+  transform: translate3d(-50%, 0, 0);
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  overscroll-behavior: contain;
+}
+
+.place-sheet--dragging { transition: none; }
+.place-sheet--collapsed {
+  transform: translate3d(-50%, calc(100% - 108px), 0);
+}
+
+.place-sheet__handle-control {
+  display: flex;
+  flex: 0 0 29px;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  padding: 0;
+  background: #fff;
+  cursor: ns-resize;
+  touch-action: none;
+  user-select: none;
+}
+.place-sheet__handle-control:focus-visible {
+  outline: 2px solid #0d7e72;
+  outline-offset: -3px;
+}
+.place-sheet__handle {
+  width: 48px;
+  height: 5px;
+  border-radius: 8px;
+  background: #becac9;
+}
+
+.place-sheet__topline {
+  flex: 0 0 auto;
+  min-height: 83px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 20px 14px;
+  border-bottom: 1px solid #eaf0ee;
+}
+.place-sheet__heading { min-width: 0; }
+.place-sheet__eyebrow {
+  display: block;
+  font-weight: 800;
+  color: #12786b;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  line-height: 1.4;
+  margin-bottom: 2px;
+}
+.place-sheet__heading h2 {
+  font-size: clamp(17px, 4vw, 20px);
+  line-height: 1.25;
+  font-weight: 760;
+  margin: 0 0 5px;
+  overflow-wrap: anywhere;
+}
+.place-sheet__heading p {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #546d68;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.place-sheet__close {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 0;
+  background: #edf3f1;
+  color: #3e625d;
+  font-size: 25px;
+  font-weight: 400;
+  line-height: 1;
+  cursor: pointer;
+}
+.place-sheet__close:focus-visible, .place-sheet__actions button:focus-visible,
+.place-sheet__route-button:focus-visible { outline: 3px solid #4fc8b2; outline-offset: 2px; }
+
+.place-sheet__scroll {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px 18px 22px;
+  scrollbar-width: thin;
+  scrollbar-color: #b9d4cd transparent;
+}
+.place-sheet__overview { margin-bottom: 17px; }
+.place-sheet__status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 12px;
+  color: #8c3b35;
+  font-size: 13px;
+  font-weight: 720;
+}
+.place-sheet__status > span { color: #da695f; font-size: 17px; line-height: 1; }
+.place-sheet__status--active { color: #176d56; }
+.place-sheet__status--active > span { color: #22a979; }
+.place-sheet__facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.place-sheet__facts > div {
+  min-width: 0;
+  padding: 12px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border: 1px solid #e7efec;
+  border-radius: 13px;
+  background: #f7faf9;
+}
+.place-sheet__fact-icon { color: #247d70; line-height: 1; font-size: 15px; }
+.place-sheet__facts small { color: #677c77; line-height: 1.25; font-size: 10px; }
+.place-sheet__facts strong { color: #1b3832; font-size: 13px; line-height: 1.3; overflow-wrap: anywhere; }
+
+.place-sheet__section {
+  padding: 17px 0;
+  border-top: 1px solid #eaf0ee;
+  scroll-margin-top: 12px;
+}
+.place-sheet__section-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 12px;
+}
+.place-sheet__section-title > span { font-size: 19px; line-height: 1; }
+.place-sheet__section h3 {
+  margin: 0;
+  color: #163b34;
+  font-size: 15px;
+  line-height: 1.35;
+  font-weight: 780;
+}
+.place-sheet__fund { border: 1px solid #d5e9e3; background: #f1faf6; padding: 16px; border-radius: 17px; margin-bottom: 13px; }
+.place-sheet__fund-content { padding-left: 2px; }
+.place-sheet__meta-label {
+  display: block;
+  color: #6e8880;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+.place-sheet__fund-name {
+  display: block;
+  font-size: 18px;
+  line-height: 1.4;
+  color: #145a4a;
+  overflow-wrap: anywhere;
+}
+.place-sheet__description {
+  margin: 9px 0 0;
+  line-height: 1.65;
+  font-size: 13px;
+  color: #334e49;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.place-sheet__muted {
+  margin: 8px 0 0;
+  color: #71817c;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.place-sheet__booking { border: 1px solid #bbdfd6; background: #f3fbf7; padding: 14px; border-radius: 14px; margin-bottom: 10px; }
+.place-sheet__booking p { margin: 4px 0 0; font-size: 12px; color: #55796b; }
+.place-sheet__booking p.place-sheet__booking-status { font-size: 14px; color: #0a6852; font-weight: 760; }
+
+.place-sheet__contacts { padding-top: 21px; }
+.place-sheet__managers { display: flex; flex-direction: column; gap: 9px; }
+.place-sheet__manager {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  padding: 12px;
+  border: 1px solid #e6eeea;
+  border-radius: 13px;
+  background: #fff;
+}
+.place-sheet__manager-avatar {
+  flex: 0 0 36px;
+  height: 36px;
+  width: 36px;
+  display: grid;
+  place-items: center;
+  background: #eaf6f2;
+  border-radius: 50%;
+}
+.place-sheet__manager-details { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.place-sheet__manager-details strong { font-size: 14px; line-height: 1.35; overflow-wrap: anywhere; }
+.place-sheet__manager-details span { color: #83908c; font-size: 11px; }
+.place-sheet__manager-details a { text-decoration: none; font-size: 13px; font-weight: 750; color: #087a6c; overflow-wrap: anywhere; }
+.place-sheet__manager-details small { color: #6c7f78; font-size: 12px; }
+
+.place-sheet__route-details {
+  padding: 10px 12px;
+  background: #f7faf9;
+  border: 1px solid #e2ebe8;
+  border-radius: 12px;
+  font-size: 13px;
+}
+.place-sheet__route-details summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  font-weight: 650;
+  list-style: none;
+}
+.place-sheet__route-details summary::-webkit-details-marker { display: none; }
+.place-sheet__route-details summary span { font-size: 18px; }
+.place-sheet__route-details[open] summary span { transform: rotate(180deg); }
+.place-sheet__route-content { padding-top: 8px; }
+.place-sheet__route-content p { margin: 7px 0; line-height: 1.5; }
+.place-sheet__route-content small { color: #637974; font-size: 11px; }
+.place-sheet__route-button {
+  width: 100%;
+  margin-top: 9px;
+  border: 0;
+  padding: 12px;
+  border-radius: 10px;
+  background: #dcedea;
+  font-size: 13px;
+  font-weight: 700;
+  color: #115e50;
+  cursor: pointer;
+}
+
+.place-sheet__actions {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: 0.9fr 1.4fr;
+  gap: 10px;
+  padding: 13px 16px calc(13px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid #e5efeb;
+  background: #fff;
+  box-shadow: 0 -5px 18px rgba(31, 71, 59, 0.06);
+}
+.place-sheet__actions button {
+  min-height: 51px;
+  padding: 10px 8px;
+  border-radius: 12px;
+  font-size: clamp(12px, 3.4vw, 15px);
+  line-height: 1.3;
+  font-weight: 760;
+  cursor: pointer;
+}
+.place-sheet__contact-button {
+  border: 1px solid #b7dcd2;
+  color: #146658;
+  background: #f1faf6;
+}
+.place-sheet__book-button {
+  border: 1px solid #067461;
+  background: #087b65;
+  color: #fff;
+  box-shadow: 0 3px 9px rgba(5, 104, 83, 0.16);
+}
+.place-sheet__book-button:disabled { cursor: default; opacity: 0.6; box-shadow: none; }
+.place-sheet__book-button--booked { background: #dff5ed; border-color: #c4eadc; color: #146853; opacity: 1 !important; }
+
+@media (max-width: 600px) {
+  .place-sheet { bottom: 6px; width: calc(100% - 12px); height: min(82dvh, 760px); border-radius: 23px 23px 17px 17px; }
+  .place-sheet__topline { padding-left: 17px; padding-right: 17px; }
+  .place-sheet__scroll { padding: 13px 15px 20px; }
+  .place-sheet__fund { padding: 14px; }
+  .place-sheet__actions { gap: 8px; padding-left: 12px; padding-right: 12px; }
+}
+@media (max-height: 510px) {
+  .place-sheet { height: calc(100dvh - 12px); }
+  .place-sheet__actions button { min-height: 42px; }
+}

@@ -371,10 +371,10 @@ export default function MoscowMap({
       element.type = "button";
       element.className = "hostel-marker";
       element.dataset.hostelId = String(hostel.id);
-      element.title = hostel.name;
+      element.title = `${hostel.name} · ${hostel.address}`;
       element.setAttribute(
         "aria-label",
-        `Открыть пункт: ${hostel.name}`
+        `Открыть пункт: ${hostel.name}, ${hostel.address}`
       );
 
       element.textContent = "⌂";

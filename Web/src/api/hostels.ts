@@ -44,13 +44,20 @@ async function authorize(): Promise<string> {
   return accessToken;
 }
 
+export interface PublicManager {
+  name: string;
+  phone: string | null;
+}
+
+export interface FundInfo {
+  name: string;
+  description: string;
+}
+
+// Поддержка старого API при обновлении фронта и сервера по отдельности.
 export interface ManagerInfo {
-  id: number;
   username: string;
-  user_type: number;
-  phone_number: string;
-  id_homestay: number;
-  last_booking: string;
+  phone_number: string | null;
 }
 
 export interface BookingInfo {
@@ -71,18 +78,13 @@ export interface BackendPlace {
   is_working: number;
   additional_info: string | null;
   homestay_type: number;
-
-  // Названия полей соответствуют БД
   longtitude: number | null;
   latitude: number | null;
-
-  manager_info:
-    | ManagerInfo
-    | Record<string, never>;
-
-  booking:
-    | BookingInfo
-    | Record<string, never>;
+  fund?: FundInfo | null;
+  category_label?: string;
+  managers?: PublicManager[];
+  manager_info: ManagerInfo | Record<string, never>;
+  booking: BookingInfo | Record<string, never>;
 }
 
 interface PlacesResponse {
@@ -107,14 +109,12 @@ export async function getHostels(): Promise<
 
   if (!response.ok) {
     throw new Error(
-      `Ошибка загрузки ночлежек: ${response.status}`
+      `Ошибка загрузки пунктов: ${response.status}`
     );
   }
 
   const data: PlacesResponse =
     await response.json();
-
-  console.log("PLACES FROM SERVER:", data);
 
   return data.places;
 }
@@ -206,7 +206,7 @@ export async function bookHostel(
      */
     if (response.status === 404) {
       throw new Error(
-        "Не удалось найти выбранную ночлежку или ваш профиль. Обновите приложение и попробуйте снова."
+        "Не удалось найти выбранный пункт или ваш профиль. Обновите приложение и попробуйте снова."
       );
     }
 
@@ -217,7 +217,7 @@ export async function bookHostel(
      */
     if (response.status === 400) {
       throw new Error(
-        "К сожалению, в этой ночлежке сейчас нет свободных мест."
+        "К сожалению, в этом пункте сейчас нет свободных мест."
       );
     }
 
@@ -240,7 +240,7 @@ export async function bookHostel(
      */
     if (response.status === 409) {
       throw new Error(
-        "Вы уже забронировали место в этой ночлежке."
+        "Вы уже забронировали место в этом пункте."
       );
     }
 

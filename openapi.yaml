@@ -81,7 +81,16 @@ paths:
                   homestay_type: 4
                   longtitude: 37.8302216
                   latitude: 55.7468395
-                  manager_info: {}
+                  fund:
+                    name: Светлый путь
+                    description: Помогаем людям получить поддержку.
+                  category_label: Ночной автобус с едой, медикаментами и соц. помощью
+                  managers:
+                  - name: Сотрудник пункта
+                    phone: '+7 999 000-00-00'
+                  manager_info:
+                    username: Сотрудник пункта
+                    phone_number: '+7 999 000-00-00'
                   booking: {}
         '401':
           description: JWT истёк или не прошёл проверку
@@ -121,7 +130,7 @@ paths:
                 $ref: '#/components/schemas/BookingResponse'
               example:
                 status: success
-                message: User 456383042 booked homestay 4
+                message: Заявка на бронирование создана
                 last_booking: '2026-09-28T22:18:32'
                 available_beds: 29
                 booking_id: 1
@@ -361,6 +370,34 @@ components:
           type: integer
           example: 0
       title: Booking
+    PlaceFund:
+      type: object
+      required: [name, description]
+      properties:
+        name:
+          type: string
+          example: Светлый путь
+        description:
+          type: string
+          example: Помощь людям в трудной ситуации.
+    PlaceManager:
+      type: object
+      required: [name, phone]
+      properties:
+        name:
+          type: string
+          example: Сотрудник пункта
+        phone:
+          type: [string, 'null']
+          example: '+7 999 000-00-00'
+    LegacyManagerInfo:
+      type: object
+      required: [username, phone_number]
+      properties:
+        username:
+          type: string
+        phone_number:
+          type: string
     Place:
       type: object
       required:
@@ -375,6 +412,9 @@ components:
       - homestay_type
       - longtitude
       - latitude
+      - fund
+      - category_label
+      - managers
       - manager_info
       - booking
       properties:
@@ -438,10 +478,23 @@ components:
           - 'null'
           format: double
           example: 55.7468395
-        manager_info:
-          description: Объект менеджера пункта либо пустой объект {}.
+        fund:
+          description: Фонд, к которому относится пункт (или null).
           oneOf:
-          - $ref: '#/components/schemas/User'
+          - $ref: '#/components/schemas/PlaceFund'
+          - type: 'null'
+        category_label:
+          type: string
+          description: Человекочитаемое название категории помощи.
+        managers:
+          type: array
+          description: Все назначенные менеджеры без служебных ID.
+          items:
+            $ref: '#/components/schemas/PlaceManager'
+        manager_info:
+          description: Первый менеджер для обратной совместимости (только имя и телефон) или {}.
+          oneOf:
+          - $ref: '#/components/schemas/LegacyManagerInfo'
           - type: object
             maxProperties: 0
         booking:
