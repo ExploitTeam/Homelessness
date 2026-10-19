@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from database.db_manager import *
 from database.classes import HomestayTypes
 from database import access
+from maxbot.formatting import point_card, escape as md_escape
 
 
 load_dotenv()
@@ -69,17 +70,17 @@ def _paginate(homestays: list, page: int) -> tuple[list, int, int]:
 
 
 def _build_geo_results_text(homestays: list, selected_types: list, page: int, pages: int, total: int) -> str:
-    header = "Доступные точки (от самой близкой до дальней):"
+    header = "**📍 Ближайшие пункты помощи**\nОт ближайшего к дальнему:"
     labels = _selected_type_labels(selected_types)
     if labels:
-        header += "\nФильтр: " + ", ".join(labels)
+        header += "\nФильтр: " + ", ".join(md_escape(l) for l in labels)
     if total > HOMESTAYS_PER_PAGE:
         header += f"\nСтраница {page}/{pages}"
 
     if not homestays:
         body = "Пунктов выбранных типов не найдено."
     else:
-        body = "\n\n".join(str(h) for h in homestays)
+        body = "\n\n".join(point_card(h) for h in homestays)
     return f"{header}\n{body}"
 
 
@@ -184,7 +185,7 @@ async def on_sending_geo(update, bot):
             latitude=latitude,
             page=page,
         )
-        await bot.send_msg(id, text, keyboard.keyboard)
+        await bot.send_msg(id, text, keyboard.keyboard, markdown=True)
 
 
 async def _update_geo_message(update, bot, selected_types: list, page: int, step: dict):
@@ -204,9 +205,9 @@ async def _update_geo_message(update, bot, selected_types: list, page: int, step
         page=page,
     )
     if msg_id:
-        await bot.edit_msg(msg_id, text, keyboard.keyboard)
+        await bot.edit_msg(msg_id, text, keyboard.keyboard, markdown=True)
     else:
-        await bot.send_msg(user_id, text, keyboard.keyboard)
+        await bot.send_msg(user_id, text, keyboard.keyboard, markdown=True)
 
 
 @bot.message_handler(func=lambda msg, tp:

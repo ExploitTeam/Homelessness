@@ -18,9 +18,9 @@ class FakeBot:
     def __init__(self):
         self.sent=[]
         self.edited=[]
-    async def send_msg(self, uid, text, keyboard=None):
+    async def send_msg(self, uid, text, keyboard=None, **kwargs):
         self.sent.append((uid,text,keyboard))
-    async def edit_msg(self,mid,text,keyboard=None):
+    async def edit_msg(self,mid,text,keyboard=None, **kwargs):
         self.edited.append((mid,text,keyboard))
 
 

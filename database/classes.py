@@ -57,7 +57,7 @@ class User:
         return (f"🆔 {self.id}\n"
                 f"👤 Имя: {self.username or '-'}\n"
                 f"⚡️ Роль: {self.__get_type()}\n"
-                f"📱 Телефон: {self.phone_number or '-'}\n"
+                f"📱 Телефон: {self.phone_number or 'Номер телефона не указан'}\n"
                 f"{'🏛️ Фонд: ' + fund['name'] + chr(10) if fund else ''}"
                 f"{'📍 Пункты: ' + ', '.join(str(p.id) + ' — ' + p.address for p in points) + chr(10) if points else ''}"
                 f"🏠 Последняя бронь: {self.last_booking or '-'}")
@@ -96,7 +96,7 @@ class Homestay:
         managers = get_homestay_managers(self.id)
         fund = get_fund(self.fund_id)
         manager_text = "\n".join(
-            f"😎 {manager.username or manager.id} (ID {manager.id}), телефон: {manager.phone_number or '-'}"
+            f"😎 {manager.username or 'Сотрудник пункта'}, телефон: {manager.phone_number or 'Номер телефона не указан'}"
             for manager in managers
         ) or "Не назначены"
         try:
@@ -163,7 +163,7 @@ class Booking:
         homestay = get_homestay(id=self.homestay_id)
         address = homestay.address if homestay else "Пункт удалён"
         managers = get_homestay_managers(self.homestay_id)
-        manager_text = ", ".join(f"{m.username or m.id} ({m.phone_number or '-'})" for m in managers) or "не назначены"
+        manager_text = "; ".join(f"{m.username or 'Сотрудник пункта'} ({m.phone_number or 'Номер телефона не указан'})" for m in managers) or "не назначены"
         return (f"ID бронирования: {self.id}\n"
                 f"Дата: {self.date_time}\n"
                 f"📍 Адрес: {address}\n"

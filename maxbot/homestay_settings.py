@@ -3,6 +3,7 @@ from maxbot.functions import *
 import dotenv
 import parser.coordinates_finder as coordinates_finder
 from database import db_manager, classes, access
+from maxbot.formatting import escape as md_escape, point_card
 
 dotenv.load_dotenv()
 USER_TYPE_USER = 0
@@ -559,44 +560,62 @@ async def create_input_address(update, bot):
 
 
 @bot.message_handler(func=lambda msg, tp:
-msg.get("callback", {}).get("payload", "") == "edit_homestay")
-async def edit_user_button_pressed(update, bot, send_new = False):
-    actor = await require_panel_access(update, bot)
-    if not actor:
+msg.get('callback',{}).get('payload') == 'edit_homestay')
+async def edit_user_button_pressed(update,bot,send_new=False):
+    actor=await require_panel_access(update,bot)
+    if not actor:return
+    points=access.managed_points(actor)
+    # Только доступные фонды: менеджеру — по его пунктам, администратору фонда — свой.
+    ids={p.fund_id for p in points}
+    if access.is_global(actor):
+        funds=db_manager.get_funds()
+    elif actor.user_type==access.FUND_ADMIN:
+        funds=[db_manager.get_fund(actor.fund_id)]
+    else:
+        funds=[db_manager.get_fund(fid) for fid in ids]
+    funds=sorted((f for f in funds if f),key=lambda f:f['name'])
+    kb=InlineKeyboardMarkup()
+    kb.add_button('⬅️ На главную',button_types.callback,'load_start')
+    for fund in funds:
+        count=sum(p.fund_id==fund['id'] for p in points)
+        kb.add_button(f'🏛️ {fund["name"][:35]} ({count})',button_types.callback,
+                      json.dumps({'command':'point_fund','fund':fund['id']}))
+    if access.is_global(actor):
+        kb.add_button('➕ Создать фонд',button_types.callback,'funds_panel')
+    text='**🏠 Управление пунктами**\nВыберите фонд, чтобы увидеть его пункты.' if funds else (
+        'Вы пока не привязаны ни к одному пункту.' if actor.user_type==access.MANAGER
+        else 'Пока нет фондов. Сначала создайте фонд.')
+    mid=update.get('message',{}).get('body',{}).get('mid') or update.get('callback',{}).get('body',{}).get('mid')
+    if send_new or not mid:
+        await bot.send_msg(actor.id,text,kb.keyboard,markdown=bool(funds))
+    else:
+        await bot.edit_msg(mid,text,kb.keyboard,markdown=bool(funds))
+
+
+@bot.message_handler(func=lambda m,t: safe_json_loads(m.get('callback',{}).get('payload')).get('command')=='point_fund')
+async def point_fund(update,bot):
+    actor=get_actor(extract_user_id(update))
+    fid=int(safe_json_loads(update['callback']['payload']).get('fund') or 0)
+    fund=db_manager.get_fund(fid)
+    allowed=bool(fund) and (access.can_manage_fund(actor,fid) or
+                         bool(actor and actor.user_type==access.MANAGER and
+                              any(p.fund_id==fid for p in access.managed_points(actor))))
+    if not allowed:
+        await deny_access(bot,extract_user_id(update))
         return
+    points=[p for p in access.managed_points(actor) if p.fund_id==fid]
+    kb=InlineKeyboardMarkup()
+    kb.add_button('⬅️ К фондам',button_types.callback,'edit_homestay')
+    if access.can_create_point(actor,fid):
+        kb.add_button('➕ Создать пункт',button_types.callback,
+                      json.dumps({'command':'choose_create_fund','fund':fid}))
+    for point in points:
+        kb.add_button('📍 '+point.address[:46],button_types.callback,
+                      json.dumps({'command':'edit_one_homestay','homestay_id':point.id}))
+    await bot.edit_msg(update.get('message',{}).get('body',{}).get('mid') or update.get('callback',{}).get('body',{}).get('mid'),
+                       f'**🏛️ {md_escape(fund["name"])}**\n\nВыберите пункт для управления.' if points else
+                       f'**🏛️ {md_escape(fund["name"])}**\n\nПунктов пока нет.',kb.keyboard,markdown=True)
 
-    user = update.get('callback', {}).get('user', {})
-    id = user.get('user_id', 0)
-    all_homestays = access.managed_points(actor)
-
-    keyboard = InlineKeyboardMarkup()
-    keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
-    if is_admin(actor):
-        keyboard.add_button("🏠 Добавить новый пункт",
-                            button_types.callback,
-                            payload=json.dumps({
-                                "command": "add_homestay",
-                            }))
-    for i in all_homestays:
-        fund=db_manager.get_fund(i.fund_id)
-        keyboard.add_button(f"📍 {i.address} ({fund['name'] if fund else '-'})",
-                            button_types.callback,
-                            payload=json.dumps({
-                                "command": "edit_one_homestay",
-                                "homestay_id": i.id
-                            }))
-    msg_id = update.get('message', {}).get('body', {}).get('mid', "")
-    if is_manager(actor) and not all_homestays:
-        text = "Вы не привязаны ни к одному пункту."
-    elif is_manager(actor):
-        text = "Ваш пункт 👇"
-    else:
-        text = "Добавьте новый пункт или отредактируйте существующий 👇"
-
-    if send_new:
-        await bot.send_msg(id, text, keyboard.keyboard)
-    else:
-        await bot.edit_msg(msg_id, text, keyboard.keyboard)
 
 @bot.message_handler(func=lambda msg, tp:
 safe_json_loads(msg.get("callback", {}).get("payload", "")).get("command", "") == "edit_one_homestay")
@@ -616,10 +635,12 @@ async def edit_one_homestay(update, bot, send_new = False, homestay_id = -1):
     msg_id = update.get('message', {}).get('body', {}).get('mid', "")
     homestay = get_homestay(homestay_id)
     managers=db_manager.get_homestay_managers(homestay_id)
-    usr_info_homestay=(', '.join(f'{u.username or u.id} (ID {u.id})' for u in managers)
+    usr_info_homestay=(', '.join(f'{u.username or "Сотрудник пункта"} — '
+                                 f'{u.phone_number or "Номер телефона не указан"}' for u in managers)
                        or 'Не назначены')
     keyboard.add_button("⬅️ На главную", button_types.callback, payload="load_start")
-    keyboard.add_button("⬅️ К пунктам", button_types.callback, payload="edit_homestay")
+    keyboard.add_button('⬅️ К пунктам фонда',button_types.callback,
+                        payload=json.dumps({'command':'point_fund','fund':homestay.fund_id}))
     actor=db_manager.get_user(id=id)
     if access.can_manage_fund(actor,homestay.fund_id):
         keyboard.add_button('👥 Менеджеры пункта',button_types.callback,json.dumps({
@@ -649,9 +670,9 @@ async def edit_one_homestay(update, bot, send_new = False, homestay_id = -1):
         {"command": "update_geo_info", "homestay_id": homestay_id}
     ))
     if not send_new:
-        await bot.edit_msg(msg_id, f"Информация о пункте:\n{homestay}\n\nМенеджер:\n{usr_info_homestay}", keyboard.keyboard)
+        await bot.edit_msg(msg_id, point_card(homestay),keyboard.keyboard,markdown=True)
     else:
-        await bot.send_msg(id, f"Информация о пункте:\n{homestay}\n\nМенеджер:\n{usr_info_homestay}", keyboard.keyboard)
+        await bot.send_msg(id, point_card(homestay),keyboard.keyboard,markdown=True)
 
 @bot.message_handler(func=lambda msg, tp:
 safe_json_loads(msg.get("callback", {}).get("payload", "")).get("command") in HOMESTAY_ACTIONS)
@@ -710,13 +731,14 @@ async def point_staff(update,bot):
     managers=db_manager.get_homestay_managers(point_id)
     kb=InlineKeyboardMarkup()
     kb.add_button('⬅️ К пункту',button_types.callback,json.dumps({'command':'edit_one_homestay','homestay_id':point_id}))
-    kb.add_button('➕ Назначить менеджера по MAX ID',button_types.callback,
+    kb.add_button('➕ Назначить менеджера',button_types.callback,
                   json.dumps({'command':'point_staff_add','homestay_id':point_id}))
     for manager in managers:
-        kb.add_button(f'➖ Снять {manager.username or manager.id} ({manager.id})',button_types.callback,
+        kb.add_button(f'➖ {str(manager.username or "Сотрудник")[:32]}',button_types.callback,
                       json.dumps({'command':'point_staff_remove','homestay_id':point_id,'user':manager.id}))
     await bot.edit_msg(update.get('message',{}).get('body',{}).get('mid'),
-                       '👥 Менеджеры этого пункта:\n' + (', '.join(str(m.id) for m in managers) or 'Не назначены'),kb.keyboard)
+                       '👥 Менеджеры пункта:\n' + ('\n'.join(f'• {m.username or "Сотрудник"} — '
+                       f'{m.phone_number or "Номер телефона не указан"}' for m in managers) or 'Не назначены'),kb.keyboard)
 
 
 @bot.message_handler(func=lambda m,t: safe_json_loads(m.get('callback',{}).get('payload')).get('command')=='point_staff_add')

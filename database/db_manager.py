@@ -54,6 +54,10 @@ def initialize_database():
                 PRIMARY KEY(point_id, manager_id)
             );
             CREATE INDEX IF NOT EXISTS idx_pm_manager ON point_managers(manager_id);
+            -- Счётчик никогда не очищается, даже когда активные брони удалены.
+            CREATE TABLE IF NOT EXISTS booking_ids (
+                id INTEGER PRIMARY KEY AUTOINCREMENT
+            );
             CREATE TABLE IF NOT EXISTS booking_history (
                 booking_id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL,
                 homestay_id INTEGER NOT NULL, fund_id INTEGER,
@@ -91,6 +95,11 @@ def initialize_database():
         conn.execute("""INSERT OR IGNORE INTO point_managers(point_id, manager_id)
                         SELECT id_homestay, id FROM users
                         WHERE user_type=1 AND id_homestay IN (SELECT id FROM homestays)""")
+        # При переходе с версии без счётчика резервируем все старые ID.
+        max_used = conn.execute("SELECT MAX(id) FROM (SELECT id FROM bookings UNION ALL SELECT booking_id FROM booking_history)").fetchone()[0] or 0
+        seq_row = conn.execute("SELECT seq FROM sqlite_sequence WHERE name='booking_ids'").fetchone()
+        if max_used > (seq_row[0] if seq_row else 0):
+            conn.execute('INSERT INTO booking_ids(id) VALUES(?)', (max_used,))
         now = _utc_now()
         conn.execute("""INSERT OR IGNORE INTO booking_history
                         (booking_id,user_id,homestay_id,fund_id,address_snapshot,
@@ -395,31 +404,19 @@ def insert_or_update_booking(booking: Booking | None = None) -> bool:
             conn.execute("PRAGMA foreign_keys = ON")
             cursor = conn.cursor()
 
+            # Одно блокирование для выделения номера, записи и события.
+            conn.execute('BEGIN IMMEDIATE')
             if booking.id:
-                cursor.execute("""
-                    INSERT INTO bookings (
-                        id, user_id, homestay_id, date_time, is_approved
-                    ) VALUES (?, ?, ?, ?, ?)
-                    ON CONFLICT(id) DO UPDATE SET
-                        user_id = excluded.user_id,
-                        homestay_id = excluded.homestay_id,
-                        date_time = excluded.date_time,
-                        is_approved = excluded.is_approved
-                """, (
-                    booking.id,
-                    booking.user_id,
-                    booking.homestay_id,
-                    booking.date_time,
-                    booking.is_approved,
-                ))
+                # Нельзя заново создать ранее удалённую заявку с тем же ID.
+                if not cursor.execute('SELECT 1 FROM bookings WHERE id=?',
+                                      (booking.id,)).fetchone():
+                    return False
+                cursor.execute("""UPDATE bookings SET user_id=?, homestay_id=?,
+                    date_time=?, is_approved=? WHERE id=?""", (
+                    booking.user_id,booking.homestay_id,booking.date_time,
+                    booking.is_approved,booking.id))
             else:
-                # История переживает удаление активной записи; не переиспользуем её ID.
-                # BEGIN IMMEDIATE сериализует одновременные бронирования.
-                conn.execute('BEGIN IMMEDIATE')
-                next_id = cursor.execute("""SELECT MAX(id) FROM (
-                    SELECT id FROM bookings UNION ALL SELECT booking_id AS id FROM booking_history
-                )""").fetchone()[0]
-                booking.id = (next_id or 0) + 1
+                booking.id = cursor.execute('INSERT INTO booking_ids DEFAULT VALUES').lastrowid
                 cursor.execute("""INSERT INTO bookings (
                     id, user_id, homestay_id, date_time, is_approved
                 ) VALUES (?, ?, ?, ?, ?)""", (
@@ -775,6 +772,49 @@ def edit_fund(fund_id, name=None, description=None):
         except sqlite3.IntegrityError:
             return False
 
+
+
+def delete_fund(fund_id, actor_id):
+    """Необратимое удаление фонда с пунктами. Журнал заявок не удаляем.
+
+    Права перепроверяем внутри транзакции, чтобы старые callback не работали
+    после отзыва роли. Возвращаем список затронутых броней для уведомлений.
+    """
+    from database.access import global_admin_ids, BOT_ADMIN, FUND_ADMIN
+    with _connect(timeout=15) as conn:
+        conn.execute('PRAGMA foreign_keys=ON')
+        conn.execute('BEGIN IMMEDIATE')
+        role = conn.execute('SELECT user_type,fund_id FROM users WHERE id=?',
+                            (actor_id,)).fetchone()
+        fund = conn.execute('SELECT id FROM funds WHERE id=?', (fund_id,)).fetchone()
+        allowed = role and (role[0] == BOT_ADMIN or actor_id in global_admin_ids()
+                            or (role[0] == FUND_ADMIN and role[1] == fund_id))
+        if not fund or not allowed:
+            return None
+        active = conn.execute("SELECT b.id,b.user_id,b.homestay_id,b.date_time,b.is_approved "
+            "FROM bookings b JOIN homestays h ON h.id=b.homestay_id WHERE h.fund_id=?",
+            (fund_id,)).fetchall()
+        for row in active:
+            booking = Booking(*row)
+            _record_booking(conn, booking, 'removed', actor_id=actor_id, finished=True)
+            conn.execute('DELETE FROM bookings WHERE id=?', (booking.id,))
+        point_ids = [x[0] for x in conn.execute('SELECT id FROM homestays WHERE fund_id=?',
+                                                (fund_id,))]
+        # Сохраняем возможность читать историю и исключаем осиротевшие ссылки.
+        conn.execute('UPDATE users SET id_homestay=NULL WHERE id_homestay IN '
+                     '(SELECT id FROM homestays WHERE fund_id=?)', (fund_id,))
+        conn.execute('DELETE FROM point_managers WHERE point_id IN '
+                     '(SELECT id FROM homestays WHERE fund_id=?)', (fund_id,))
+        conn.execute('DELETE FROM homestays WHERE fund_id=?', (fund_id,))
+        # Выбираем действующий запасной пункт менеджера для старого API.
+        conn.execute("UPDATE users SET id_homestay=(SELECT MIN(point_id) "
+                     "FROM point_managers WHERE manager_id=users.id) "
+                     "WHERE user_type=1 AND id_homestay IS NULL")
+        conn.execute('UPDATE users SET user_type=0,fund_id=NULL,id_homestay=NULL '
+                     'WHERE user_type=3 AND fund_id=?', (fund_id,))
+        conn.execute('UPDATE users SET fund_id=NULL WHERE fund_id=?', (fund_id,))
+        conn.execute('DELETE FROM funds WHERE id=?', (fund_id,))
+        return {'points': len(point_ids), 'bookings': [(r[0],r[1]) for r in active]}
 
 def get_manager_point_ids(manager_id):
     with _connect() as conn:

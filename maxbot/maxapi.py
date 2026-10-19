@@ -20,10 +20,12 @@ class Bot:
                      "Content-Type": "application/json",},
         )
 
-    async def _send_single(self, chat_id: int, text: str, btns=None):
+    async def _send_single(self, chat_id: int, text: str, btns=None, markdown=False):
         body = {'text': text,
                 'attachments': [{'type': 'inline_keyboard',
                                  'payload': {'buttons': btns}}] if btns else []}
+        if markdown:
+            body['format'] = 'markdown' 
         async with self.session.post(f'{self.api_url}/messages',
                                      params={'user_id':chat_id},json=body,
                                      ssl=self.ssl_context) as response:
@@ -32,7 +34,7 @@ class Bot:
                 raise ConnectionMaxError(f'Error while sending message. Code: {response.status}')
             return data
 
-    async def send_msg(self, chat_id: int, text: str, btns=None):
+    async def send_msg(self, chat_id: int, text: str, btns=None, markdown=False):
         """Совместимо с API: его первое уведомление о новой заявке дублируется
         ОСТАЛЬНЫМ менеджерам пункта (без правок api/http_server.py).
         """
@@ -56,13 +58,14 @@ class Bot:
         result=None
         first_error=None
         try:
-            result=await self._send_single(chat_id,text,btns)
+            result=await self._send_single(chat_id,text,btns,markdown=True) if markdown else await self._send_single(chat_id,text,btns)
         except Exception as error:
             first_error=error
         # Уведомление всем менеджерам, независимо от ошибки доставки первому.
         if extra:
-            results=await asyncio.gather(*(self._send_single(uid,text,btns) for uid in extra),
-                                         return_exceptions=True)
+            results=await asyncio.gather(*(self._send_single(uid,text,btns,markdown=True)
+                                            if markdown else self._send_single(uid,text,btns)
+                                            for uid in extra),return_exceptions=True)
             for uid,status in zip(extra,results):
                 if isinstance(status,Exception):
                     warnings.warn(f'Booking manager notification failed for {uid}: {status}')
@@ -70,7 +73,7 @@ class Bot:
             raise first_error
         return result
 
-    async def edit_msg(self, message_id : int, text : str, btns: list = []):
+    async def edit_msg(self, message_id : int, text : str, btns=None, markdown=False):
         """Send a message to chat"""
 
         body = {'text': text,
@@ -82,7 +85,8 @@ class Bot:
                           }
                       }
                   ] if btns else []}
-        print(body)
+        if markdown:
+            body['format'] = 'markdown'
         async with self.session.put(
             f'{self.api_url}/messages',
             params={'message_id': message_id},
@@ -133,14 +137,18 @@ class Bot:
                     await self.command_handlers[command](update, self)
                     return
 
+        # Один update должен обрабатываться ровно одним обработчиком.
+        # Иначе смена next_step внутри обработчика названия фонда позволяет
+        # обработчику описания принять ТО ЖЕ сообщение за второй шаг.
         for filter_func, handler_func in self.text_handlers:
             try:
-                if filter_func(update, tp):
-                    await handler_func(update, self)
+                matched = filter_func(update, tp)
             except Exception as filter_err:
                 print(f"Ошибка в фильтре: {filter_err}")
                 continue
-        print(tp, update)
+            if matched:
+                await handler_func(update, self)
+                return
 
     async def pulling(self):
         """Cycle for getting events (messages)"""

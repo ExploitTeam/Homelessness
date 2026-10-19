@@ -5,6 +5,7 @@ from maxbot.bot_manager import bot,keyboard_to_start,HOMESTAYS_PER_PAGE
 from maxbot.inline_keyboard import InlineKeyboardMarkup,button_types
 from maxbot.functions import safe_json_loads
 from database import db_manager as db,access
+from maxbot.formatting import escape as md_escape, contact_label, manager_label
 
 
 def _user(update):
@@ -37,12 +38,23 @@ def _status(status):
             'removed':'❌ Удалена сотрудником','expired':'⌛ Истекла автоматически'}.get(status,status)
 
 
-def _history_entry(item):
-    return (f"🆔 Бронь #{item['booking_id']} | {_status(item['status'])}\n"
-            f"👤 MAX ID: {item['user_id']}\n"
-            f"📍 {item['address_snapshot'] or 'Пункт удалён'}\n"
-            f"📅 Создана: {item['date_time']}"
-            + (f"\n⏱ Закрыта: {item['finished_at']}" if item['finished_at'] else ''))
+def _history_entry(item, show_user=False):
+    return (f"**Бронь №{item['booking_id']}** — {_status(item['status'])}\n"
+            + (f"👤 MAX ID: {item['user_id']}\n" if show_user else '')
+            + f"📍 {md_escape(item['address_snapshot'] or 'Пункт удалён')}\n"
+            + f"📅 Создана: {md_escape(item['date_time'])}"
+            + (f"\n⏱ Закрыта: {md_escape(item['finished_at'])}" if item['finished_at'] else ''))
+
+
+def _booking_card(booking):
+    point=db.get_homestay(id=booking.homestay_id)
+    staff=db.get_homestay_managers(booking.homestay_id)
+    contacts='\n'.join('• '+md_escape(manager_label(m))+' — '+md_escape(contact_label(m)) for m in staff)
+    return (f'**Бронь №{booking.id}**\n'
+            f'{"✅ Подтверждена" if booking.is_approved else "🟠 Ожидает подтверждения"}\n'
+            f'📍 {md_escape(point.address if point else "Пункт удалён")}\n'
+            f'📅 {md_escape(booking.date_time or "Дата не указана")}\n'
+            f'**Контакты сотрудников:**\n{contacts or "Не назначены"}')
 
 
 def _send_text(texts):
@@ -73,7 +85,7 @@ def _active_user_view(actor,page):
     _pager(kb,'my_bookings_page',page,total)
     for b in visible:
         kb.add_button(f'↩️ Отменить #{b.id}',button_types.callback,_payload('delete_my_booking',booking_id=b.id,page=page))
-    return ('📋 Активные бронирования\n\n'+_send_text([str(b) for b in visible]),kb)
+    return ('**📋 Активные бронирования**\n\n'+_send_text([_booking_card(b) for b in visible]),kb)
 
 
 @bot.message_handler(func=lambda m,t: m.get('callback',{}).get('payload')=='my_bookings')
@@ -81,7 +93,7 @@ async def my_bookings(update,bot):
     actor=_user(update)
     if actor:
         text,kb=_active_user_view(actor,1)
-        await bot.edit_msg(_mid(update),text,kb.keyboard)
+        await bot.edit_msg(_mid(update),text,kb.keyboard,markdown=True)
 
 
 @bot.message_handler(func=lambda m,t: safe_json_loads(m.get('callback',{}).get('payload')).get('command')=='my_bookings_page')
@@ -90,7 +102,7 @@ async def my_bookings_page(update,bot):
     if actor:
         page=int(safe_json_loads(update['callback']['payload']).get('page') or 1)
         text,kb=_active_user_view(actor,page)
-        await bot.edit_msg(_mid(update),text,kb.keyboard)
+        await bot.edit_msg(_mid(update),text,kb.keyboard,markdown=True)
 
 
 @bot.message_handler(func=lambda m,t: safe_json_loads(m.get('callback',{}).get('payload')).get('command')=='delete_my_booking')
@@ -105,7 +117,7 @@ async def delete_my_booking(update,bot):
             await _notify_managers(bot,booking.homestay_id,
                                    f'↩️ Пользователь отменил бронь #{booking.id}.\n{summary}')
     text,kb=_active_user_view(actor,int(data.get('page') or 1))
-    await bot.edit_msg(_mid(update),text,kb.keyboard)
+    await bot.edit_msg(_mid(update),text,kb.keyboard,markdown=True)
 
 
 def _history_view(actor,page,point_id=None,search_id=None):
@@ -124,7 +136,8 @@ def _history_view(actor,page,point_id=None,search_id=None):
     title=f'🕘 История бронирований пункта #{point_id}' if point_id else '🕘 История моих бронирований'
     if search_id is not None:
         title+=f'\nПоиск MAX ID: {search_id}'
-    return title+f'\nВсего: {total}\n\n'+_send_text([_history_entry(x) for x in items]),kb
+    return '**'+title+'**'+f'\nВсего: {total}\n\n'+_send_text(
+        [_history_entry(x,show_user=point_id is not None) for x in items]),kb
 
 
 @bot.message_handler(func=lambda m,t: m.get('callback',{}).get('payload')=='my_booking_history')
@@ -132,7 +145,7 @@ async def my_booking_history(update,bot):
     actor=_user(update)
     if actor:
         text,kb=_history_view(actor,1)
-        await bot.edit_msg(_mid(update),text,kb.keyboard)
+        await bot.edit_msg(_mid(update),text,kb.keyboard,markdown=True)
 
 
 @bot.message_handler(func=lambda m,t: safe_json_loads(m.get('callback',{}).get('payload')).get('command')=='my_history_page')
@@ -141,7 +154,7 @@ async def my_history_page(update,bot):
     if actor:
         data=safe_json_loads(update['callback']['payload'])
         text,kb=_history_view(actor,int(data.get('page') or 1))
-        await bot.edit_msg(_mid(update),text,kb.keyboard)
+        await bot.edit_msg(_mid(update),text,kb.keyboard,markdown=True)
 
 
 @bot.message_handler(func=lambda m,t: m.get('callback',{}).get('payload')=='manage_bookings')
@@ -176,7 +189,7 @@ def _staff_booking_view(point_id,page):
     for b in visible:
         user=db.get_user(id=b.user_id)
         blocks.append(f"🆔 #{b.id} • {'✅ Подтверждена' if b.is_approved else '🟠 Ожидает'}\n"
-                      f"👤 {user.username if user else '-'} (MAX ID {b.user_id})\n"
+                      f"👤 {md_escape(user.username if user else 'Неизвестный пользователь')} (MAX ID {b.user_id})\n"
                       f"📅 {b.date_time}")
         row=InlineKeyboardMarkup()
         if not b.is_approved:
@@ -185,7 +198,7 @@ def _staff_booking_view(point_id,page):
         row.add_button('❌ Отклонить #'+str(b.id),button_types.callback,
                        _payload('staff_delete_booking',booking_id=b.id,homestay_id=point_id,page=page))
         kb.add_buttons_one_line(row.keyboard)
-    return (f'📋 Активные бронирования\n📍 {point.address if point else point_id}\n\n'
+    return (f'**📋 Активные бронирования**\n📍 {md_escape(point.address if point else point_id)}\n\n'
             +_send_text(blocks),kb)
 
 
@@ -197,7 +210,7 @@ async def _show_staff_view(update,bot):
         await bot.send_msg(actor.id if actor else 0,'⛔ Нет доступа к этому пункту.')
         return
     text,kb=_staff_booking_view(point,int(data.get('page') or 1))
-    await bot.edit_msg(_mid(update),text,kb.keyboard)
+    await bot.edit_msg(_mid(update),text,kb.keyboard,markdown=True)
 
 
 @bot.message_handler(func=lambda m,t: safe_json_loads(m.get('callback',{}).get('payload')).get('command')
@@ -253,7 +266,8 @@ async def update_booking_info(update,bot):
     kb=InlineKeyboardMarkup()
     kb.add_button('🔄 Обновить',button_types.callback,_payload('update_booking_info',booking_id=booking.id))
     kb.add_button('⬅️ Главное меню',button_types.callback,'load_start')
-    await bot.edit_msg(_mid(update),f'📋 Сведения о бронировании\n{booking}',kb.keyboard)
+    await bot.edit_msg(_mid(update),'**📋 Сведения о бронировании**\n\n'+_booking_card(booking),
+                       kb.keyboard,markdown=True)
 
 
 @bot.message_handler(func=lambda m,t: safe_json_loads(m.get('callback',{}).get('payload')).get('command')
@@ -270,7 +284,7 @@ async def point_history(update,bot):
                           int(search_id) if search_id is not None else None)
     if search_id is not None:
         kb.add_button('❎ Сбросить поиск',button_types.callback,_payload('point_history',point=point))
-    await bot.edit_msg(_mid(update),text,kb.keyboard)
+    await bot.edit_msg(_mid(update),text,kb.keyboard,markdown=True)
 
 
 @bot.message_handler(func=lambda m,t: safe_json_loads(m.get('callback',{}).get('payload')).get('command')
@@ -302,4 +316,4 @@ async def history_search_input(update,bot):
     bot.clear_next_step(actor.id)
     text,kb=_history_view(actor,1,point,uid)
     kb.add_button('❎ Сбросить поиск',button_types.callback,_payload('point_history',point=point))
-    await bot.send_msg(actor.id,text,kb.keyboard)
+    await bot.send_msg(actor.id,text,kb.keyboard,markdown=True)

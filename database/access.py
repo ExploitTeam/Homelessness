@@ -74,4 +74,4 @@ def can_manage_account(actor, target):
     assigned = set(db.get_manager_point_ids(target.id))
     in_fund = {p.id for p in managed_points(actor)}
     # Нельзя сменить роль менеджера с назначениями в других фондах.
-    return bool(assigned) and assigned.issubset(in_fund)
+    return assigned.issubset(in_fund)

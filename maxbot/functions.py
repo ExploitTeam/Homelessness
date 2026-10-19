@@ -6,6 +6,7 @@ from database.db_manager import *
 from database import access
 from dotenv import load_dotenv
 import json
+from maxbot.formatting import escape as escape_md
 
 load_dotenv()
 ADMINS = access.global_admin_ids()
@@ -15,7 +16,7 @@ start_text = ("Привет{} 👋\n"
               "Отправьте геопозицию, чтобы посмотреть ближайшие пункты. "
               "Категории можно выбрать в списке. "
               "Также доступно мини-приложение с картой пунктов.\n\n"
-              "Ваш MAX ID: {}.")
+              "Помощь доступна всем, кто в ней нуждается.")
 
 
 def show_all(name=None, get_in_dict=False):
@@ -25,7 +26,7 @@ def show_all(name=None, get_in_dict=False):
     if not points:
         return "Пока нет доступных пунктов помощи."
     return "\n\n".join(
-        f"🆔 {p.id}\n📍 {p.address}\n"
+        f"📍 {p.address}\n"
         f"🏠 Мест: {p.available_beds}/{p.all_beds}\n"
         f"{'🟢 Работает' if p.is_working else '🔴 Не работает'}"
         for p in points
@@ -54,18 +55,18 @@ async def do_on_start(bot, usr, msg_id=None):
     kb.add_button('📍 Отправить геопозицию',button_types.request_geo_location,payload='send_geo')
     kb.add_button('📋 Мои бронирования',button_types.callback,payload='my_bookings')
     kb.add_button('🕘 История моих броней',button_types.callback,payload='my_booking_history')
-    kb.add_button('👤 Мой профиль' if account.user_type==0 else '👥 Пользователи / профиль',
-                  button_types.callback,payload='edit_user')
+    kb.add_button('👥 Управление пользователем' if (access.is_global(account) or account.user_type==access.FUND_ADMIN)
+                  else '👤 Настройки профиля',button_types.callback,payload='edit_user')
     if access.is_global(account) or account.user_type==access.FUND_ADMIN:
         kb.add_button('🏛️ Фонды',button_types.callback,payload='funds_panel')
     if access.is_global(account) or account.user_type in (access.MANAGER,access.FUND_ADMIN):
         kb.add_button('🏠 Управление пунктами',button_types.callback,payload='edit_homestay')
         kb.add_button('✅ Управление бронированиями',button_types.callback,payload='manage_bookings')
-    text=start_text.format(f', {name}' if name else '',user_id)
+    text='**Добро пожаловать!**\n\n'+start_text.format(f', {escape_md(name)}' if name else '')
     if msg_id:
-        await bot.edit_msg(msg_id,text,kb.keyboard)
+        await bot.edit_msg(msg_id,text,kb.keyboard,markdown=True)
     else:
-        await bot.send_msg(user_id,text,kb.keyboard)
+        await bot.send_msg(user_id,text,kb.keyboard,markdown=True)
 
 
 
