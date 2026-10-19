@@ -34,7 +34,9 @@ def is_manager(actor) -> bool:
 
 
 def can_open_homestay_panel(actor) -> bool:
-    return bool(access.managed_points(actor)) or is_admin(actor)
+    # Менеджер без назначений всё равно должен видеть сообщение,
+    # что его пока не привязали к пунктам, а не отказ в доступе.
+    return is_manager(actor) or is_admin(actor)
 
 
 def can_manage_homestay(actor, homestay_id: int) -> bool:
@@ -483,7 +485,8 @@ async def create_input_beds(update, bot):
     address_text = step_data.get("address")
 
     keyboard = InlineKeyboardMarkup()
-    keyboard.add_button("❌ Отмена", button_types.callback, "edit_homestay")
+    keyboard.add_button('❌ Отмена', button_types.callback,
+                        json.dumps({'command':'point_fund','fund':step_data.get('fund_id')}))
     try:
         beds_count = int(beds_text)
     except ValueError:
@@ -517,7 +520,8 @@ async def create_input_beds(update, bot):
     db_manager.insert_or_update_homestay(new_homestay)
     bot.clear_next_step(sender_id)
     keyboard = InlineKeyboardMarkup()
-    keyboard.add_button(f"Далее", button_types.callback, "edit_homestay")
+    keyboard.add_button('К пунктам фонда', button_types.callback,
+                        json.dumps({'command':'point_fund','fund':step_data.get('fund_id')}))
     await bot.send_msg(sender_id,
                        f"✅ Пункт успешно создан!\n\n"
                        f"ID в системе: {new_homestay.id}\n"
@@ -539,7 +543,8 @@ async def create_input_address(update, bot):
 
     address_text = update.get("message", {}).get("body", {}).get('text', "").strip()
     keyboard = InlineKeyboardMarkup()
-    keyboard.add_button("❌ Отмена", button_types.callback, "edit_homestay")
+    keyboard.add_button('❌ Отмена', button_types.callback,
+                        json.dumps({'command':'point_fund','fund':step_data.get('fund_id')}))
     if not address_text:
         await bot.send_msg(sender_id, "⚠️ Адрес не может быть пустым. Введите адрес:", keyboard.keyboard)
         return
@@ -564,27 +569,25 @@ msg.get('callback',{}).get('payload') == 'edit_homestay')
 async def edit_user_button_pressed(update,bot,send_new=False):
     actor=await require_panel_access(update,bot)
     if not actor:return
+    # У администраторов единая навигация: Фонды → Фонд → Управление пунктами.
+    # Старые callback-кнопки ведут в фонды, а не открывают второе меню пунктов.
+    if access.is_global(actor) or actor.user_type == access.FUND_ADMIN:
+        from maxbot.fund_settings import fund_panel
+        await fund_panel(update,bot)
+        return
     points=access.managed_points(actor)
-    # Только доступные фонды: менеджеру — по его пунктам, администратору фонда — свой.
-    ids={p.fund_id for p in points}
-    if access.is_global(actor):
-        funds=db_manager.get_funds()
-    elif actor.user_type==access.FUND_ADMIN:
-        funds=[db_manager.get_fund(actor.fund_id)]
-    else:
-        funds=[db_manager.get_fund(fid) for fid in ids]
-    funds=sorted((f for f in funds if f),key=lambda f:f['name'])
+    # Этот список предназначен для менеджеров; администраторы открывают свой фонд.
+    funds=sorted((db_manager.get_fund(fid) for fid in {p.fund_id for p in points}),
+                 key=lambda f:f['name'] if f else '')
+    funds=[f for f in funds if f]
     kb=InlineKeyboardMarkup()
     kb.add_button('⬅️ На главную',button_types.callback,'load_start')
     for fund in funds:
         count=sum(p.fund_id==fund['id'] for p in points)
         kb.add_button(f'🏛️ {fund["name"][:35]} ({count})',button_types.callback,
                       json.dumps({'command':'point_fund','fund':fund['id']}))
-    if access.is_global(actor):
-        kb.add_button('➕ Создать фонд',button_types.callback,'funds_panel')
-    text='**🏠 Управление пунктами**\nВыберите фонд, чтобы увидеть его пункты.' if funds else (
-        'Вы пока не привязаны ни к одному пункту.' if actor.user_type==access.MANAGER
-        else 'Пока нет фондов. Сначала создайте фонд.')
+    text=('**🏠 Управление пунктами**\nВыберите фонд, чтобы увидеть ваши пункты.'
+          if funds else 'Вы пока не привязаны ни к одному пункту.')
     mid=update.get('message',{}).get('body',{}).get('mid') or update.get('callback',{}).get('body',{}).get('mid')
     if send_new or not mid:
         await bot.send_msg(actor.id,text,kb.keyboard,markdown=bool(funds))
@@ -605,7 +608,11 @@ async def point_fund(update,bot):
         return
     points=[p for p in access.managed_points(actor) if p.fund_id==fid]
     kb=InlineKeyboardMarkup()
-    kb.add_button('⬅️ К фондам',button_types.callback,'edit_homestay')
+    if access.can_manage_fund(actor, fid):
+        kb.add_button('⬅️ К фонду',button_types.callback,
+                      json.dumps({'command':'fund_show','fund':fid}))
+    else:
+        kb.add_button('⬅️ К моим пунктам',button_types.callback,'edit_homestay')
     if access.can_create_point(actor,fid):
         kb.add_button('➕ Создать пункт',button_types.callback,
                       json.dumps({'command':'choose_create_fund','fund':fid}))
@@ -716,8 +723,11 @@ async def choose_create_fund(update,bot):
         await deny_access(bot,uid)
         return
     bot.set_next_step(uid,json.dumps({'command':'create_input_address','fund_id':fid}))
+    kb=InlineKeyboardMarkup()
+    kb.add_button('❌ Отмена',button_types.callback,
+                  json.dumps({'command':'point_fund','fund':fid}))
     await bot.edit_msg(update.get('message',{}).get('body',{}).get('mid'),
-                       'Введите адрес нового пункта:',keyboard_to_start.keyboard)
+                       'Введите адрес нового пункта:',kb.keyboard)
 
 
 @bot.message_handler(func=lambda m,t: safe_json_loads(m.get('callback',{}).get('payload')).get('command')=='point_staff')

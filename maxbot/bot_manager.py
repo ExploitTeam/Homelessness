@@ -70,18 +70,18 @@ def _paginate(homestays: list, page: int) -> tuple[list, int, int]:
 
 
 def _build_geo_results_text(homestays: list, selected_types: list, page: int, pages: int, total: int) -> str:
-    header = "**📍 Ближайшие пункты помощи**\nОт ближайшего к дальнему:"
+    header = "**📍 Ближайшие пункты помощи**\n\nПункты отсортированы от ближайшего к дальнему."
     labels = _selected_type_labels(selected_types)
     if labels:
-        header += "\nФильтр: " + ", ".join(md_escape(l) for l in labels)
+        header += "\n\n🔎 **Фильтр:** " + ", ".join(md_escape(l) for l in labels)
     if total > HOMESTAYS_PER_PAGE:
-        header += f"\nСтраница {page}/{pages}"
+        header += f"\n📄 Страница {page}/{pages}"
 
     if not homestays:
         body = "Пунктов выбранных типов не найдено."
     else:
         body = "\n\n".join(point_card(h) for h in homestays)
-    return f"{header}\n{body}"
+    return f"{header}\n\n{body}"
 
 
 def _geo_filter_keyboard(selected_types: list, page: int = 1, pages: int = 1, total: int = 0) -> InlineKeyboardMarkup:

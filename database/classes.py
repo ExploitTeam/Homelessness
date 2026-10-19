@@ -52,6 +52,7 @@ class User:
 
     def __str__(self):
         from database.db_manager import get_manager_points, get_fund
+        from maxbot.formatting import format_date
         points = get_manager_points(self.id) if self.user_type == 1 else []
         fund = get_fund(self.fund_id) if self.fund_id else None
         return (f"🆔 {self.id}\n"
@@ -60,7 +61,7 @@ class User:
                 f"📱 Телефон: {self.phone_number or 'Номер телефона не указан'}\n"
                 f"{'🏛️ Фонд: ' + fund['name'] + chr(10) if fund else ''}"
                 f"{'📍 Пункты: ' + ', '.join(str(p.id) + ' — ' + p.address for p in points) + chr(10) if points else ''}"
-                f"🏠 Последняя бронь: {self.last_booking or '-'}")
+                f"🏠 Последняя бронь: {format_date(self.last_booking) if self.last_booking else '-'}")
 
 
 class Homestay:
@@ -160,12 +161,13 @@ class Booking:
 
     def __str__(self):
         from database.db_manager import get_homestay, get_homestay_managers
+        from maxbot.formatting import format_date
         homestay = get_homestay(id=self.homestay_id)
         address = homestay.address if homestay else "Пункт удалён"
         managers = get_homestay_managers(self.homestay_id)
         manager_text = "; ".join(f"{m.username or 'Сотрудник пункта'} ({m.phone_number or 'Номер телефона не указан'})" for m in managers) or "не назначены"
         return (f"ID бронирования: {self.id}\n"
-                f"Дата: {self.date_time}\n"
+                f"Дата: {format_date(self.date_time)}\n"
                 f"📍 Адрес: {address}\n"
                 f"👥 Менеджеры: {manager_text}\n"
                 f"{'🟢 Подтверждено' if self.is_approved else '🟠 Ожидает подтверждения'}")

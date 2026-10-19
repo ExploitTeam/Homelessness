@@ -93,6 +93,7 @@ async def show_fund(update,bot):
     points=[h for h in db.get_all_homestays() if h.fund_id==f_id]
     kb=InlineKeyboardMarkup()
     kb.add_button('⬅️ Фонды',button_types.callback,'funds_panel')
+    kb.add_button('🏠 Управление пунктами',button_types.callback,payload('point_fund',fund=f_id))
     kb.add_button('✏️ Название',button_types.callback,payload('fund_edit',fund=f_id,field='name'))
     kb.add_button('📝 Описание',button_types.callback,payload('fund_edit',fund=f_id,field='description'))
     kb.add_button('🗑️ Удалить фонд',button_types.callback,payload('fund_delete_prompt',fund=f_id))

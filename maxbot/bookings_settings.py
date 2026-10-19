@@ -5,7 +5,7 @@ from maxbot.bot_manager import bot,keyboard_to_start,HOMESTAYS_PER_PAGE
 from maxbot.inline_keyboard import InlineKeyboardMarkup,button_types
 from maxbot.functions import safe_json_loads
 from database import db_manager as db,access
-from maxbot.formatting import escape as md_escape, contact_label, manager_label
+from maxbot.formatting import escape as md_escape, contact_label, manager_label, format_date
 
 
 def _user(update):
@@ -42,8 +42,8 @@ def _history_entry(item, show_user=False):
     return (f"**Бронь №{item['booking_id']}** — {_status(item['status'])}\n"
             + (f"👤 MAX ID: {item['user_id']}\n" if show_user else '')
             + f"📍 {md_escape(item['address_snapshot'] or 'Пункт удалён')}\n"
-            + f"📅 Создана: {md_escape(item['date_time'])}"
-            + (f"\n⏱ Закрыта: {md_escape(item['finished_at'])}" if item['finished_at'] else ''))
+            + f"📅 Создана: {md_escape(format_date(item['date_time']))}"
+            + (f"\n⏱ Закрыта: {md_escape(format_date(item['finished_at']))}" if item['finished_at'] else ''))
 
 
 def _booking_card(booking):
@@ -53,7 +53,7 @@ def _booking_card(booking):
     return (f'**Бронь №{booking.id}**\n'
             f'{"✅ Подтверждена" if booking.is_approved else "🟠 Ожидает подтверждения"}\n'
             f'📍 {md_escape(point.address if point else "Пункт удалён")}\n'
-            f'📅 {md_escape(booking.date_time or "Дата не указана")}\n'
+            f'📅 {md_escape(format_date(booking.date_time))}\n'
             f'**Контакты сотрудников:**\n{contacts or "Не назначены"}')
 
 
@@ -190,7 +190,7 @@ def _staff_booking_view(point_id,page):
         user=db.get_user(id=b.user_id)
         blocks.append(f"🆔 #{b.id} • {'✅ Подтверждена' if b.is_approved else '🟠 Ожидает'}\n"
                       f"👤 {md_escape(user.username if user else 'Неизвестный пользователь')} (MAX ID {b.user_id})\n"
-                      f"📅 {b.date_time}")
+                      f"📅 {md_escape(format_date(b.date_time))}")
         row=InlineKeyboardMarkup()
         if not b.is_approved:
             row.add_button('✅ Подтвердить #'+str(b.id),button_types.callback,
