@@ -1,4 +1,8 @@
-const API_URL = "https://homelessness.bot.nu";
+// В одном контейнере фронт и API находятся на одном origin. При отдельном
+// хостинге веб-сайта задайте <meta name="max-api-base-url" content="https://...">.
+// Это предотвращает незаметное обращение новой сборки к старому API-серверу.
+const configuredApi = document.querySelector<HTMLMetaElement>('meta[name="max-api-base-url"]')?.content.trim();
+const API_URL = (configuredApi || window.location.origin).replace(/\/+$/, "");
 
 let accessToken: string | null = null;
 

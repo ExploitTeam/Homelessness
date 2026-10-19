@@ -1,0 +1,1203 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+body {
+  background: #f5f5f5;
+}
+
+button {
+  font: inherit;
+}
+
+.app {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* =========================
+   HOSTEL CARD
+   ========================= */
+
+.hostel-card {
+  --hostel-sheet-peek: 88px;
+
+  position: fixed;
+  z-index: 1000;
+
+  left: 50%;
+  bottom: 20px;
+
+  width: min(460px, calc(100% - 24px));
+  max-height: calc(100dvh - 40px);
+
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  background: #fff;
+  color: #171717;
+
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 24px;
+
+  box-shadow:
+    0 20px 55px rgba(0, 0, 0, 0.2),
+    0 3px 10px rgba(0, 0, 0, 0.08);
+
+  /* Позиция задаётся CSS, а не вычисляется JS.
+     Процент translateY считается от собственной высоты карточки. */
+  transform: translate3d(-50%, 0, 0);
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.hostel-card--dragging {
+  transition: none;
+  user-select: none;
+}
+
+/* Когда карточка опущена, видимая верхняя часть работает как кнопка:
+   достаточно кликнуть/тапнуть по ней, чтобы вернуть карточку наверх. */
+.hostel-card--expanded {
+  transform: translate3d(-50%, 0, 0);
+}
+
+.hostel-card--collapsed {
+  /* Не зависит от window.innerHeight / offsetHeight / масштаба MAX. */
+  transform: translate3d(
+    -50%,
+    calc(100% - var(--hostel-sheet-peek)),
+    0
+  );
+  cursor: pointer;
+}
+
+/*
+ * Явная зона клика/drag поверх всей верхней части карточки в обоих состояниях.
+ * Она остаётся sticky при прокрутке и работает как для мыши, так и для touch.
+ */
+.hostel-card__sheet-hitbox {
+  position: sticky;
+  z-index: 25;
+  top: 0;
+
+  display: block;
+  width: 100%;
+  height: var(--hostel-sheet-peek);
+  margin: 0 0 calc(-1 * var(--hostel-sheet-peek));
+  padding: 0;
+
+  background: transparent;
+  border: 0;
+  outline: none;
+
+  cursor: ns-resize;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.hostel-card--collapsed .hostel-card__sheet-hitbox {
+  cursor: pointer;
+}
+
+.hostel-card__sheet-hitbox:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: -4px;
+  border-radius: 20px 20px 0 0;
+}
+
+.hostel-card__sheet-handle-area {
+  position: sticky;
+  z-index: 12;
+  top: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 100%;
+  height: 42px;
+  margin: 0;
+
+  background:
+    linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 1) 0%,
+      rgba(255, 255, 255, 0.97) 74%,
+      rgba(255, 255, 255, 0) 100%
+    );
+
+  pointer-events: none;
+  touch-action: none;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.hostel-card--dragging .hostel-card__sheet-handle-area {
+  cursor: grabbing;
+}
+
+.hostel-card__sheet-handle-area:hover .hostel-card__sheet-handle {
+  background: #9ca3af;
+}
+
+.hostel-card__sheet-handle {
+  width: 52px;
+  height: 5px;
+  border-radius: 999px;
+  background: #c7c7cc;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.hostel-card__content {
+  position: relative;
+  padding: 24px;
+}
+
+.hostel-card__content--main {
+  padding-top: 12px;
+}
+
+.hostel-card h2 {
+  margin: 0 45px 8px 0;
+  font-size: 24px;
+  line-height: 1.2;
+  font-weight: 750;
+}
+
+.hostel-card__close {
+  position: absolute;
+  z-index: 30;
+  top: 34px;
+  right: 14px;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 50%;
+  background: #f1f1f1;
+  color: #555;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.hostel-card__address {
+  margin: 0 0 16px;
+  color: #555;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+/* =========================
+   WORKING STATUS
+   ========================= */
+
+.hostel-card__working {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 64px;
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  gap: 12px;
+  border-radius: 14px;
+}
+
+.hostel-card__working--open {
+  background: #ecfdf3;
+  color: #166534;
+}
+
+.hostel-card__working--closed {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.hostel-card__working-icon {
+  flex: 0 0 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  font-size: 18px;
+  line-height: 22px;
+}
+
+.hostel-card__working-text {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  min-width: 0;
+  gap: 3px;
+}
+
+.hostel-card__working-text strong {
+  display: block;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 700;
+}
+
+.hostel-card__working-text small {
+  display: block;
+  font-size: 13px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+/* =========================
+   DISTANCE + BEDS
+   ========================= */
+
+.hostel-card__distance {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  width: 100%;
+  margin: 0 0 14px;
+  gap: 5px;
+  color: #555;
+  font-size: 15px;
+  line-height: 22px;
+}
+
+.hostel-card__distance strong {
+  font-weight: 700;
+  color: #333;
+}
+
+.hostel-card__info {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: #f6f6f6;
+  font-size: 15px;
+  line-height: 22px;
+}
+
+.hostel-card__booking-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  margin-top: 12px;
+  padding: 13px 14px;
+  border: 1px solid #bbf7d0;
+  border-radius: 14px;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.hostel-card__booking-banner > span {
+  font-size: 20px;
+}
+
+.hostel-card__booking-banner > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hostel-card__booking-banner strong {
+  font-size: 14px;
+}
+
+.hostel-card__booking-banner small {
+  font-size: 12px;
+  line-height: 17px;
+}
+
+/* =========================
+   METRO
+   ========================= */
+
+.hostel-card__metro {
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: 18px;
+  background: #f7f8fa;
+}
+
+.hostel-card__metro-title {
+  margin-bottom: 14px;
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 700;
+}
+
+.hostel-card__metro-route {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hostel-card__metro-point {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.hostel-card__metro-point > span {
+  flex: 0 0 auto;
+  font-size: 20px;
+  line-height: 24px;
+}
+
+.hostel-card__metro-point > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.hostel-card__metro-point small {
+  color: #777;
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.hostel-card__metro-point strong {
+  font-size: 15px;
+  line-height: 20px;
+}
+
+.hostel-card__metro-point div > span {
+  color: #666;
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.hostel-card__metro-arrow {
+  margin-left: 6px;
+  color: #888;
+  font-size: 18px;
+  line-height: 20px;
+}
+
+.hostel-card__metro-walk {
+  margin-top: 10px;
+  color: #666;
+  font-size: 13px;
+  line-height: 19px;
+}
+
+.hostel-card__route-button {
+  width: 100%;
+  margin-top: 14px;
+  padding: 11px 14px;
+  border: 0;
+  border-radius: 12px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.hostel-card__route-button:hover {
+  background: #1d4ed8;
+}
+
+.hostel-card__route-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px 13px;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #1e40af;
+}
+
+.hostel-card__route-status > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  border-radius: 50%;
+  background: #2563eb;
+  color: white;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.hostel-card__route-status > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hostel-card__route-status strong {
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.hostel-card__route-status small {
+  color: #3b5ca8;
+  font-size: 12px;
+  line-height: 17px;
+}
+
+/* =========================
+   DESCRIPTION + BUTTONS
+   ========================= */
+
+.hostel-card__description {
+  margin: 18px 0;
+  color: #555;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.hostel-card__buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.hostel-card__book,
+.hostel-card__contacts,
+.hostel-card__back {
+  min-height: 48px;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.hostel-card__book {
+  border: 0;
+  background: #2563eb;
+  color: #fff;
+}
+
+.hostel-card__book:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.hostel-card__book--success {
+  background: #16a34a;
+}
+
+.hostel-card__contacts {
+  border: 1px solid #ddd;
+  background: #fff;
+  color: #222;
+}
+
+/* =========================
+   CONTACTS + BOOKING
+   ========================= */
+
+.hostel-card__content--contacts {
+  padding-top: 38px;
+}
+
+.hostel-card__contacts-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 16px;
+  border-radius: 18px;
+  background: #eef4ff;
+  font-size: 26px;
+}
+
+.hostel-card__details-section {
+  margin-top: 22px;
+}
+
+.hostel-card__details-section h3 {
+  margin: 0 0 10px;
+  color: #333;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.hostel-card__details-card {
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #fafafa;
+}
+
+.hostel-card__contact-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
+  text-align: left;
+}
+
+.hostel-card__contact-item + .hostel-card__contact-item {
+  border-top: 1px solid #e8e8e8;
+}
+
+.hostel-card__contact-item > span:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  min-width: 28px;
+  font-size: 19px;
+}
+
+.hostel-card__contact-item > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.hostel-card__contact-item small {
+  color: #777;
+  font-size: 11px;
+  line-height: 15px;
+}
+
+.hostel-card__contact-item strong,
+.hostel-card__contact-item a {
+  color: #222;
+  font-size: 14px;
+  line-height: 19px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.hostel-card__contact-item a {
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.hostel-card__empty-state {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 14px;
+  border-radius: 14px;
+  background: #f6f6f6;
+  color: #555;
+  text-align: left;
+}
+
+.hostel-card__empty-state > span {
+  font-size: 20px;
+}
+
+.hostel-card__empty-state > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.hostel-card__empty-state strong {
+  color: #333;
+  font-size: 13px;
+}
+
+.hostel-card__empty-state small {
+  color: #777;
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.hostel-card__back {
+  width: 100%;
+  margin-top: 22px;
+  border: 0;
+  background: #eee;
+  color: #222;
+}
+
+/* =========================
+   MAP STATUS
+   ========================= */
+
+.map-status,
+.map-error {
+  position: fixed;
+  z-index: 900;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  font-size: 14px;
+  line-height: 20px;
+  text-align: center;
+}
+
+.map-error {
+  color: #b91c1c;
+}
+
+/* =========================
+   MOBILE BOTTOM SHEET
+   ========================= */
+
+@media (max-width: 600px) {
+  .hostel-card {
+    left: 50%;
+    right: auto;
+    top: auto;
+    bottom: 8px;
+
+    width: calc(100% - 12px);
+    height: min(78dvh, 720px);
+    max-height: calc(100dvh - 12px);
+
+    border-radius: 24px 24px 18px 18px;
+
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  .hostel-card__close {
+    position: sticky;
+    float: right;
+    top: 34px;
+    margin: 0 10px -38px 0;
+  }
+
+  .hostel-card__content {
+    padding: 16px 18px 22px;
+  }
+
+  .hostel-card__content--main,
+  .hostel-card__content--contacts {
+    padding-top: 10px;
+  }
+
+  .hostel-card h2 {
+    margin-right: 46px;
+    font-size: 21px;
+    line-height: 1.25;
+  }
+
+  .hostel-card__working {
+    min-height: 60px;
+    margin-bottom: 12px;
+    padding: 11px 12px;
+  }
+
+  .hostel-card__working-text strong {
+    font-size: 14px;
+    line-height: 19px;
+  }
+
+  .hostel-card__working-text small {
+    font-size: 12px;
+    line-height: 17px;
+  }
+
+  .hostel-card__distance {
+    margin-bottom: 12px;
+    font-size: 14px;
+    line-height: 21px;
+  }
+
+  .hostel-card__metro {
+    margin-top: 14px;
+    padding: 14px;
+  }
+
+  .hostel-card__description {
+    margin: 14px 0;
+  }
+
+  .hostel-card__buttons {
+    grid-template-columns: 1fr;
+  }
+
+  .hostel-card__book,
+  .hostel-card__contacts {
+    min-height: 50px;
+  }
+
+  .map-status,
+  .map-error {
+    top: 10px;
+  }
+}
+
+/* =========================
+   BOOKING NOTICE
+   ========================= */
+
+.booking-notice-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.32);
+}
+
+.booking-notice {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+
+  width: min(420px, 100%);
+  padding: 20px 52px 20px 20px;
+
+  border-radius: 18px;
+  color: #fff;
+
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
+}
+
+.booking-notice--success {
+  background: #16a34a;
+}
+
+.booking-notice--error {
+  background: #dc2626;
+}
+
+.booking-notice__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+
+  font-size: 21px;
+  font-weight: 800;
+}
+
+.booking-notice__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.booking-notice__title {
+  margin-bottom: 6px;
+  font-size: 16px;
+  line-height: 1.3;
+  font-weight: 750;
+}
+
+.booking-notice__text {
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  opacity: 0.96;
+}
+
+.booking-notice__close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 34px;
+  height: 34px;
+  padding: 0;
+
+  border: 0;
+  border-radius: 50%;
+
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+
+  font-size: 23px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.map-status,
+.map-error {
+  pointer-events: none;
+}
+
+.hostel-card {
+  pointer-events: auto;
+}
+
+.hostel-card__metro-unavailable {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 13px;
+  border-radius: 12px;
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.hostel-card__metro-unavailable > span {
+  flex: 0 0 auto;
+  font-size: 18px;
+  line-height: 22px;
+}
+
+.hostel-card__metro-unavailable > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.hostel-card__metro-unavailable strong {
+  color: #374151;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.hostel-card__metro-unavailable small {
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 17px;
+}
+
+/* =========================
+   MINI APP V4 · КАРТОЧКА ПУНКТА
+   ========================= */
+
+.place-sheet {
+  position: fixed;
+  z-index: 1000;
+  left: 50%;
+  bottom: 12px;
+  width: min(490px, calc(100% - 24px));
+  height: min(81dvh, 770px);
+  max-height: calc(100dvh - 20px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 24px;
+  border: 1px solid rgba(13, 51, 47, 0.09);
+  background: #fff;
+  color: #193331;
+  box-shadow: 0 16px 55px rgba(0, 42, 40, 0.22), 0 4px 12px rgba(0, 0, 0, 0.06);
+  transform: translate3d(-50%, 0, 0);
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  overscroll-behavior: contain;
+}
+
+.place-sheet--dragging { transition: none; }
+.place-sheet--collapsed {
+  transform: translate3d(-50%, calc(100% - 108px), 0);
+}
+
+.place-sheet__handle-control {
+  display: flex;
+  flex: 0 0 29px;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  padding: 0;
+  background: #fff;
+  cursor: ns-resize;
+  touch-action: none;
+  user-select: none;
+}
+.place-sheet__handle-control:focus-visible {
+  outline: 2px solid #0d7e72;
+  outline-offset: -3px;
+}
+.place-sheet__handle {
+  width: 48px;
+  height: 5px;
+  border-radius: 8px;
+  background: #becac9;
+}
+
+.place-sheet__topline {
+  flex: 0 0 auto;
+  min-height: 83px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 20px 14px;
+  border-bottom: 1px solid #eaf0ee;
+}
+.place-sheet__heading { min-width: 0; }
+.place-sheet__eyebrow {
+  display: block;
+  font-weight: 800;
+  color: #12786b;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  line-height: 1.4;
+  margin-bottom: 2px;
+}
+.place-sheet__heading h2 {
+  font-size: clamp(17px, 4vw, 20px);
+  line-height: 1.25;
+  font-weight: 760;
+  margin: 0 0 5px;
+  overflow-wrap: anywhere;
+}
+.place-sheet__heading p {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #546d68;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.place-sheet__close {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 0;
+  background: #edf3f1;
+  color: #3e625d;
+  font-size: 25px;
+  font-weight: 400;
+  line-height: 1;
+  cursor: pointer;
+}
+.place-sheet__close:focus-visible, .place-sheet__actions button:focus-visible,
+.place-sheet__route-button:focus-visible { outline: 3px solid #4fc8b2; outline-offset: 2px; }
+
+.place-sheet__scroll {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px 18px 22px;
+  scrollbar-width: thin;
+  scrollbar-color: #b9d4cd transparent;
+}
+.place-sheet__overview { margin-bottom: 17px; }
+.place-sheet__status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 12px;
+  color: #8c3b35;
+  font-size: 13px;
+  font-weight: 720;
+}
+.place-sheet__status > span { color: #da695f; font-size: 17px; line-height: 1; }
+.place-sheet__status--active { color: #176d56; }
+.place-sheet__status--active > span { color: #22a979; }
+.place-sheet__facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.place-sheet__facts > div {
+  min-width: 0;
+  padding: 12px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border: 1px solid #e7efec;
+  border-radius: 13px;
+  background: #f7faf9;
+}
+.place-sheet__fact-icon { color: #247d70; line-height: 1; font-size: 15px; }
+.place-sheet__facts small { color: #677c77; line-height: 1.25; font-size: 10px; }
+.place-sheet__facts strong { color: #1b3832; font-size: 13px; line-height: 1.3; overflow-wrap: anywhere; }
+
+.place-sheet__section {
+  padding: 17px 0;
+  border-top: 1px solid #eaf0ee;
+  scroll-margin-top: 12px;
+}
+.place-sheet__section-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 12px;
+}
+.place-sheet__section-title > span { font-size: 19px; line-height: 1; }
+.place-sheet__section h3 {
+  margin: 0;
+  color: #163b34;
+  font-size: 15px;
+  line-height: 1.35;
+  font-weight: 780;
+}
+.place-sheet__fund { border: 1px solid #d5e9e3; background: #f1faf6; padding: 16px; border-radius: 17px; margin-bottom: 13px; }
+.place-sheet__fund-content { padding-left: 2px; }
+.place-sheet__meta-label {
+  display: block;
+  color: #6e8880;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+.place-sheet__fund-name {
+  display: block;
+  font-size: 18px;
+  line-height: 1.4;
+  color: #145a4a;
+  overflow-wrap: anywhere;
+}
+.place-sheet__description {
+  margin: 9px 0 0;
+  line-height: 1.65;
+  font-size: 13px;
+  color: #334e49;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.place-sheet__muted {
+  margin: 8px 0 0;
+  color: #71817c;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.place-sheet__booking { border: 1px solid #bbdfd6; background: #f3fbf7; padding: 14px; border-radius: 14px; margin-bottom: 10px; }
+.place-sheet__booking p { margin: 4px 0 0; font-size: 12px; color: #55796b; }
+.place-sheet__booking p.place-sheet__booking-status { font-size: 14px; color: #0a6852; font-weight: 760; }
+
+.place-sheet__contacts { padding-top: 21px; }
+.place-sheet__managers { display: flex; flex-direction: column; gap: 9px; }
+.place-sheet__manager {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  padding: 12px;
+  border: 1px solid #e6eeea;
+  border-radius: 13px;
+  background: #fff;
+}
+.place-sheet__manager-avatar {
+  flex: 0 0 36px;
+  height: 36px;
+  width: 36px;
+  display: grid;
+  place-items: center;
+  background: #eaf6f2;
+  border-radius: 50%;
+}
+.place-sheet__manager-details { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.place-sheet__manager-details strong { font-size: 14px; line-height: 1.35; overflow-wrap: anywhere; }
+.place-sheet__manager-details span { color: #83908c; font-size: 11px; }
+.place-sheet__manager-details a { text-decoration: none; font-size: 13px; font-weight: 750; color: #087a6c; overflow-wrap: anywhere; }
+.place-sheet__manager-details small { color: #6c7f78; font-size: 12px; }
+
+.place-sheet__route-details {
+  padding: 10px 12px;
+  background: #f7faf9;
+  border: 1px solid #e2ebe8;
+  border-radius: 12px;
+  font-size: 13px;
+}
+.place-sheet__route-details summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  font-weight: 650;
+  list-style: none;
+}
+.place-sheet__route-details summary::-webkit-details-marker { display: none; }
+.place-sheet__route-details summary span { font-size: 18px; }
+.place-sheet__route-details[open] summary span { transform: rotate(180deg); }
+.place-sheet__route-content { padding-top: 8px; }
+.place-sheet__route-content p { margin: 7px 0; line-height: 1.5; }
+.place-sheet__route-content small { color: #637974; font-size: 11px; }
+.place-sheet__route-button {
+  width: 100%;
+  margin-top: 9px;
+  border: 0;
+  padding: 12px;
+  border-radius: 10px;
+  background: #dcedea;
+  font-size: 13px;
+  font-weight: 700;
+  color: #115e50;
+  cursor: pointer;
+}
+
+.place-sheet__actions {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: 0.9fr 1.4fr;
+  gap: 10px;
+  padding: 13px 16px calc(13px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid #e5efeb;
+  background: #fff;
+  box-shadow: 0 -5px 18px rgba(31, 71, 59, 0.06);
+}
+.place-sheet__actions button {
+  min-height: 51px;
+  padding: 10px 8px;
+  border-radius: 12px;
+  font-size: clamp(12px, 3.4vw, 15px);
+  line-height: 1.3;
+  font-weight: 760;
+  cursor: pointer;
+}
+.place-sheet__contact-button {
+  border: 1px solid #b7dcd2;
+  color: #146658;
+  background: #f1faf6;
+}
+.place-sheet__book-button {
+  border: 1px solid #067461;
+  background: #087b65;
+  color: #fff;
+  box-shadow: 0 3px 9px rgba(5, 104, 83, 0.16);
+}
+.place-sheet__book-button:disabled { cursor: default; opacity: 0.6; box-shadow: none; }
+.place-sheet__book-button--booked { background: #dff5ed; border-color: #c4eadc; color: #146853; opacity: 1 !important; }
+
+@media (max-width: 600px) {
+  .place-sheet { bottom: 6px; width: calc(100% - 12px); height: min(82dvh, 760px); border-radius: 23px 23px 17px 17px; }
+  .place-sheet__topline { padding-left: 17px; padding-right: 17px; }
+  .place-sheet__scroll { padding: 13px 15px 20px; }
+  .place-sheet__fund { padding: 14px; }
+  .place-sheet__actions { gap: 8px; padding-left: 12px; padding-right: 12px; }
+}
+@media (max-height: 510px) {
+  .place-sheet { height: calc(100dvh - 12px); }
+  .place-sheet__actions button { min-height: 42px; }
+}

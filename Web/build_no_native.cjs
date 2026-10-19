@@ -8,11 +8,13 @@ const ts = require('typescript');
 const root = __dirname;
 const src = path.join(root, 'src');
 const dist = path.join(root, 'dist');
-const vendor = path.join(dist, 'vendor');
+const RELEASE = 'v5-20261019';
+const BASE = `/releases/${RELEASE}`;
+const vendor = path.join(dist, 'releases', RELEASE, 'vendor');
 
 function read(name) { return fs.readFileSync(path.join(root, 'node_modules', name), 'utf8'); }
 function write(relative, content) {
-  const filename = path.join(dist, relative);
+  const filename = path.join(dist, relative === 'index.html' ? relative : path.join('releases', RELEASE, relative));
   fs.mkdirSync(path.dirname(filename), { recursive: true });
   fs.writeFileSync(filename, content);
 }
@@ -54,14 +56,14 @@ for (const f of ['favicon.svg','icons.svg']) {
   const source = path.join(root, 'public', f);
   if (fs.existsSync(source)) fs.copyFileSync(source, path.join(dist, f));
 }
-for (const f of ['App.css', 'index.css']) fs.copyFileSync(path.join(src, f), path.join(dist, f));
+for (const f of ['App.css', 'index.css']) fs.copyFileSync(path.join(src, f), path.join(dist, 'releases', RELEASE, f));
 
 function adjustImports(js) {
   // Удаление CSS imports (стили подключены в index.html).
   js = js.replace(/^[ \t]*import\s+["'][^"']+\.css["'];?\s*$/gm, '');
   // Bare packages resolved to bundled ESM vendor.
   js = js.replace(/((?:\bfrom\s*|\bimport\s*)["'])(react|react-dom|react-dom\/client|react\/jsx-runtime|maplibre-gl)(["'])/g,
-    (_, begin, name, end) => `${begin}${name === 'maplibre-gl' ? '/vendor/maplibre-gl.mjs' : '/vendor/react-vendor.mjs'}${end}`);
+    (_, begin, name, end) => `${begin}${BASE}${name === 'maplibre-gl' ? '/vendor/maplibre-gl.mjs' : '/vendor/react-vendor.mjs'}${end}`);
   // Native browser imports always need explicit file extensions.
   js = js.replace(/((?:\bfrom\s*|\bimport\s*)["'])(\.{1,2}\/[^"']+)(["'])/g,
     (_, begin, name, end) => `${begin}${name.replace(/\.(tsx?|jsx?)$/, '')}.js${end}`);
@@ -85,8 +87,9 @@ function processDir(source) {
 processDir(src);
 write('index.html', `<!doctype html>
 <html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Пункты помощи на карте</title><link rel="icon" href="/favicon.svg">
-<link rel="stylesheet" href="/vendor/maplibre-gl.css"><link rel="stylesheet" href="/index.css"><link rel="stylesheet" href="/App.css">
+<title>Пункты помощи на карте</title><meta name="max-miniapp-version" content="${RELEASE}">
+<meta name="max-api-base-url" content=""><link rel="icon" href="/favicon.svg">
+<link rel="stylesheet" href="${BASE}/vendor/maplibre-gl.css"><link rel="stylesheet" href="${BASE}/index.css"><link rel="stylesheet" href="${BASE}/App.css">
 <script src="https://st.max.ru/js/max-web-app.js"></script></head>
-<body><div id="root"></div><script type="module" src="/src/main.js"></script></body></html>`);
+<body><div id="root"></div><script type="module" src="${BASE}/src/main.js"></script></body></html>`);
 console.log('Self-contained dist generated:', dist);

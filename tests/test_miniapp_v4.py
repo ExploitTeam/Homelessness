@@ -110,6 +110,6 @@ class MiniAppAPITests(unittest.TestCase):
     def test_built_client_static_modules_are_served(self):
         homepage = self.client.get('/')
         self.assertEqual(homepage.status_code, 200)
-        self.assertIn('/src/main.js', homepage.text)
-        self.assertEqual(self.client.get('/src/main.js').status_code, 200)
-        self.assertEqual(self.client.get('/vendor/react-vendor.mjs').status_code, 200)
+        self.assertIn('/releases/v5-20261019/src/main.js', homepage.text)
+        self.assertEqual(self.client.get('/releases/v5-20261019/src/main.js').status_code, 200)
+        self.assertEqual(self.client.get('/releases/v5-20261019/vendor/react-vendor.mjs').status_code, 200)

@@ -169,6 +169,7 @@ function App() {
 
   return (
     <div className="app">
+      <span className="app-release" aria-label="Версия интерфейса v5">v5</span>
       <MoscowMap
         hostels={hostels}
         userLocation={mapLocation}

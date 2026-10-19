@@ -15,7 +15,7 @@ from fastapi import FastAPI, HTTPException, Depends, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 import jwt
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from database.db_manager import *
 from database.classes import HomestayTypes
 from maxbot.inline_keyboard import InlineKeyboardMarkup, button_types
@@ -275,19 +275,39 @@ async def send_bot_msg(user_id: int, text: str, keyboard=None):
     return await asyncio.wrap_future(future)
 
 DIST_DIR = Path(__file__).resolve().parents[1] / "Web" / "dist"
+FRONTEND_VERSION = "v5-20261019"
+# HTML никогда не кэшируем: браузер должен каждый раз получать актуальный
+# manifest с новым URL JS/CSS. Версионированные assets кешируются долго.
+HTML_CACHE_HEADERS = {"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+                      "Pragma": "no-cache", "Expires": "0"}
+
+
+@app.get("/api/version")
+async def app_version():
+    """Публичная диагностика публикации, без доступа к БД и без токена."""
+    html = DIST_DIR / "index.html"
+    return JSONResponse(
+        {"release": FRONTEND_VERSION, "frontend_present": html.is_file(),
+         "frontend_marker": FRONTEND_VERSION in html.read_text(encoding="utf-8") if html.is_file() else False},
+        headers=HTML_CACHE_HEADERS,
+    )
+
 
 if DIST_DIR.exists():
-    # Vite кладёт хэши в /assets; автономная ESM-сборка содержит /src и /vendor.
-    if (DIST_DIR / "assets").is_dir():
-        app.mount("/assets", StaticFiles(directory=DIST_DIR / "assets"), name="assets")
-
     @app.get("/{full_path:path}")
     async def spa(full_path: str):
-        # Не позволяем относительным путям выйти за пределы каталога сборки.
+        # Не разрешаем обход каталога и не отдаём HTML вместо отсутствующих JS.
+        base = DIST_DIR.resolve()
         file_path = (DIST_DIR / full_path).resolve()
-        if full_path and file_path.is_relative_to(DIST_DIR.resolve()) and file_path.is_file():
-            return FileResponse(file_path)
-        return FileResponse(DIST_DIR / "index.html")
+        if full_path and file_path.is_relative_to(base) and file_path.is_file():
+            return FileResponse(file_path, headers=(
+                {"Cache-Control": "public, max-age=31536000, immutable"}
+                if full_path.startswith("releases/") or full_path.startswith("assets/")
+                else HTML_CACHE_HEADERS
+            ))
+        if full_path and ("." in Path(full_path).name or full_path.startswith("releases/")):
+            raise HTTPException(status_code=404, detail="Static file not found")
+        return FileResponse(DIST_DIR / "index.html", headers=HTML_CACHE_HEADERS)
 
 def start_server():
     """Функция для программного запуска сервера из любой точки проекта"""
